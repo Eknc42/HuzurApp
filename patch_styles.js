@@ -1,0 +1,10 @@
+const fs = require('fs');
+let code = fs.readFileSync('src/screens/QuranScreen.js', 'utf8');
+code = code.replace(/continueBody:[^{]*\{[^}]*\}/g, '');
+code = code.replace(/continueTextContainer:[^{]*\{[^}]*\}/g, '');
+code = code.replace(/continueSurah:[^{]*\{[^}]*\}/g, '');
+code = code.replace(/continueVerse:[^{]*\{[^}]*\}/g, '');
+code = code.replace(/continueArabic:[^{]*\{[^}]*\}/g, '');
+code = code.replace(/progressBarBg:[^{]*\{[^}]*\}/g, '');
+code = code.replace(/progressBarFill:[^{]*\{[^}]*\}/g, '');
+fs.writeFileSync('src/screens/QuranScreen.js', code);

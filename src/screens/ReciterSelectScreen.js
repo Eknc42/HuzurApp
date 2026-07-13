@@ -1,0 +1,545 @@
+// ReciterSelectScreen — Hafız Seçim Ekranı (mp3quran.net API)
+// 150+ hafız, arama, rivayet filtreleme, premium glassmorphism
+import React, { useRef, useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  TouchableOpacity,
+  Animated,
+  FlatList,
+  TextInput,
+  Dimensions,
+  ActivityIndicator,
+} from 'react-native';
+import { Colors, Spacing, Radius, Shadows } from '../theme/colors';
+import { PlayIcon, PauseIcon } from '../components/Icons';
+import { HeadphonesIcon } from '../components/IconsExtra';
+import ScreenContainer from '../components/ScreenContainer';
+import Header from '../components/Header';
+import {
+  getReciters,
+  getDefaultMoshaf,
+  getFeaturedReciters,
+} from '../services/mp3quranApi';
+import { RECITERS as STATIC_RECITERS } from '../data/reciters';
+import { playSurahFromServer, stopRecitation } from '../services/audioService';
+import { findQdcMatch } from '../services/verseTimingApi';
+
+const { width } = Dimensions.get('window');
+
+
+// Module-level pending selection (shared with parent screens)
+let _pendingReciterSelection = null;
+export function setPendingReciterSelection(reciter) {
+  _pendingReciterSelection = reciter;
+}
+export function getPendingReciterSelection() {
+  const selection = _pendingReciterSelection;
+  _pendingReciterSelection = null; // consume once
+  return selection;
+}
+
+const TABS = [
+  { id: 'featured', label: '⭐ Öne Çıkan' },
+  { id: 'all',      label: '📋 Tümü' },
+];
+
+export default function ReciterSelectScreen({ navigation, route }) {
+  const { currentReciterId, surahId } = route.params || {};
+  const [allReciters, setAllReciters] = useState([]);
+  const [displayList, setDisplayList] = useState([]);
+  const [selectedId, setSelectedId] = useState(currentReciterId || null);
+  const [playingId, setPlayingId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('featured');
+  const [loading, setLoading] = useState(true);
+
+  // Animations
+  const headerOpacity = useRef(new Animated.Value(0)).current;
+  const listOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    loadReciters();
+
+    Animated.sequence([
+      Animated.timing(headerOpacity, {
+        toValue: 1, duration: 400, useNativeDriver: true,
+      }),
+      Animated.timing(listOpacity, {
+        toValue: 1, duration: 500, useNativeDriver: true,
+      }),
+    ]).start();
+
+    return () => stopRecitation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    filterReciters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allReciters, searchQuery, activeTab]);
+
+  const loadReciters = async () => {
+    try {
+      const data = await getReciters();
+      // Annotate each reciter with a QDC id (if any) and keep ONLY those
+      // that have a QDC equivalent — these are the reciters whose audio can
+      // be perfectly synced with verse highlighting.
+      const excludedNames = ['ibrahim aldosari', 'sami aldosari'];
+      const valid = data
+        .filter(r => r.moshaf && r.moshaf.length > 0)
+        .map(r => {
+          const qdcId = findQdcMatch(r.name || '', r.letter || '');
+          return { ...r, qdcId, photo: null };
+        })
+        .filter(r => r.qdcId !== null)
+        .filter(r => {
+          const n = (r.name || '').toLowerCase();
+          return !excludedNames.some(ex => n.includes(ex));
+        });
+      setAllReciters(valid);
+    } catch (e) {
+      console.warn('Hafız yükleme hatası:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filterReciters = () => {
+    // "Seçkin 5" sekmesi: reciters.js'deki statik liste
+    if (activeTab === 'static') {
+      let list = STATIC_RECITERS.map(r => ({
+        id: r.id,
+        name: r.nameTr,
+        nameEn: r.nameEn,
+        photo: r.photo || null,
+        qdcId: r.qdcId || null,
+        moshaf: [{
+          id: r.id,
+          server: r.audioBaseUrl + '/',
+          surah_total: 114,
+          name: r.style,
+        }],
+        _isStatic: true,
+        _reciterData: r,
+      }));
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        list = list.filter(r =>
+          r.name.toLowerCase().includes(q) ||
+          (r.nameEn || '').toLowerCase().includes(q)
+        );
+      }
+
+      setDisplayList(list);
+      return;
+    }
+
+    let list = allReciters;
+
+    if (activeTab === 'featured') {
+      list = getFeaturedReciters(allReciters);
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(r =>
+        (r.name || '').toLowerCase().includes(q)
+      );
+    }
+
+    // Alfabetik sırala
+    list = [...list].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    setDisplayList(list);
+  };
+
+  const handleSelect = useCallback((reciter) => {
+    setSelectedId(reciter.id);
+
+    // Önizlemeyi durdur
+    stopRecitation();
+    setPlayingId(null);
+
+    // Statik (reciters.js) hafız ise doğrudan audioBaseUrl kullan
+    if (reciter._isStatic) {
+      const r = reciter._reciterData;
+      setPendingReciterSelection({
+        id: r.id,
+        name: r.nameTr,
+        moshaf: reciter.moshaf[0],
+        server: r.audioBaseUrl + '/',
+        qdcId: r.qdcId || null,
+        photo: r.photo || null,
+      });
+      navigation.goBack();
+      return;
+    }
+
+    const moshaf = getDefaultMoshaf(reciter);
+
+    // Store selection and go back
+    setPendingReciterSelection({
+      id: reciter.id,
+      name: reciter.name,
+      moshaf,
+      server: moshaf?.server || '',
+      qdcId: reciter.qdcId, // for perfect verse-audio sync
+      photo: reciter.photo || null,
+    });
+    navigation.goBack();
+  }, [navigation]);
+
+  const togglePreview = useCallback((reciter) => {
+    if (playingId === reciter.id) {
+      stopRecitation();
+      setPlayingId(null);
+    } else {
+      const moshaf = getDefaultMoshaf(reciter);
+      if (!moshaf) return;
+      const previewSurah = surahId || 1; // Fatiha varsayılan
+      setPlayingId(reciter.id);
+      playSurahFromServer(moshaf.server, previewSurah, {
+        onEnd: () => setPlayingId(null),
+        onError: () => setPlayingId(null),
+      });
+    }
+  }, [playingId, surahId]);
+
+  const renderReciterItem = useCallback(({ item }) => {
+    const isSelected = selectedId === item.id;
+    const isPlaying = playingId === item.id;
+    const moshaf = getDefaultMoshaf(item);
+    const surahCount = moshaf?.surah_total || 0;
+    const moshafCount = item.moshaf?.length || 0;
+    const accentColor = isSelected ? Colors.emerald : Colors.textMuted;
+
+    return (
+      <TouchableOpacity
+        onPress={() => handleSelect(item)}
+        activeOpacity={0.8}
+        style={styles.reciterCard}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.name} hafızını seç`}
+      >
+        <View style={[
+          styles.reciterInner,
+          isSelected && { borderColor: `${Colors.emerald}40` },
+        ]}>
+          {isSelected && (
+            <View style={styles.reciterGlow} />
+          )}
+
+          <View style={styles.reciterRow}>
+            {/* Avatar */}
+            <View style={[
+              styles.reciterAvatar,
+              { borderColor: isSelected ? Colors.emerald : Colors.borderSubtle },
+              isSelected && { backgroundColor: `${Colors.emerald}12` },
+            ]}>
+              {item.photo ? (
+                <Image
+                  source={{ uri: item.photo }}
+                  style={styles.reciterPhoto}
+                  defaultSource={undefined}
+                />
+              ) : (
+                <HeadphonesIcon
+                  size={20}
+                  color={accentColor}
+                />
+              )}
+            </View>
+
+            {/* Info */}
+            <View style={styles.reciterInfo}>
+              <Text style={[
+                styles.reciterName,
+                isSelected && { color: Colors.emerald },
+              ]} numberOfLines={1}>
+                {item.name}
+              </Text>
+              <View style={styles.reciterMeta}>
+                <Text style={styles.reciterStyle}>{surahCount} sure</Text>
+                {moshafCount > 1 && (
+                  <>
+                    <View style={styles.metaDot} />
+                    <Text style={styles.reciterStyle}>{moshafCount} rivayet</Text>
+                  </>
+                )}
+              </View>
+            </View>
+
+            {/* Actions */}
+            <View style={styles.reciterActions}>
+              {isSelected && (
+                <View style={styles.selectedBadge}>
+                  <Text style={styles.selectedText}>✓</Text>
+                </View>
+              )}
+              <TouchableOpacity
+                onPress={() => togglePreview(item)}
+                activeOpacity={0.7}
+                style={[styles.previewButton, isPlaying && { borderColor: Colors.emerald }]}
+                accessibilityRole="button"
+                accessibilityLabel={isPlaying ? "Önizlemeyi durdur" : "Önizlemeyi başlat"}
+              >
+                {isPlaying ? (
+                  <PauseIcon size={14} color={Colors.emerald} />
+                ) : (
+                  <PlayIcon size={14} color={Colors.textMuted} />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  }, [selectedId, playingId, handleSelect, togglePreview]);
+
+  return (
+    <ScreenContainer gradient={true}>
+      <Animated.View style={{ opacity: headerOpacity }}>
+        <Header
+          title="Hafız Seçimi"
+          onBack={() => {
+            stopRecitation();
+            navigation.goBack();
+          }}
+        />
+      </Animated.View>
+
+      <Animated.View style={[styles.searchContainer, { opacity: headerOpacity }]}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Hafız ara..."
+          placeholderTextColor={Colors.textMuted}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoCorrect={false}
+        />
+      </Animated.View>
+
+      {/* Tabs */}
+      <View style={styles.tabRow}>
+        {TABS.map(tab => (
+          <TouchableOpacity
+            key={tab.id}
+            onPress={() => setActiveTab(tab.id)}
+            activeOpacity={0.7}
+            style={[
+              styles.tab,
+              activeTab === tab.id && styles.tabActive,
+            ]}
+          >
+            <Text style={[
+              styles.tabLabel,
+              activeTab === tab.id && styles.tabLabelActive,
+            ]}>
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* List */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.emerald} />
+          <Text style={styles.loadingText}>Hafızlar yükleniyor...</Text>
+        </View>
+      ) : (
+        <Animated.View style={{ flex: 1, opacity: listOpacity }}>
+          <FlatList
+            data={displayList}
+            keyExtractor={(item) => `${item.id}`}
+            renderItem={renderReciterItem}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>Sonuç bulunamadı</Text>
+              </View>
+            }
+          />
+        </Animated.View>
+      )}
+    </ScreenContainer>
+  );
+}
+
+const styles = StyleSheet.create({
+
+  // Search
+  searchContainer: {
+    paddingHorizontal: Spacing.xl,
+    marginBottom: 12,
+  },
+  searchInput: {
+    backgroundColor: Colors.bgCard,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: Colors.textPrimary,
+  },
+
+  // Tabs
+  tabRow: {
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.xl,
+    marginBottom: 14,
+    gap: 8,
+  },
+  tab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.bgCard,
+  },
+  tabActive: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: 'rgba(16, 185, 129, 0.25)',
+  },
+  tabLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textMuted,
+  },
+  tabLabelActive: {
+    color: Colors.emerald,
+  },
+
+  // Loading
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    fontSize: 13,
+    color: Colors.textMuted,
+    marginTop: 12,
+  },
+
+  // List
+  listContent: {
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: 40,
+  },
+
+  // Reciter card
+  reciterCard: {
+    marginBottom: 10,
+  },
+  reciterInner: {
+    backgroundColor: Colors.bgCard,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    padding: 16,
+    overflow: 'hidden',
+    position: 'relative',
+    ...Shadows.sm,
+  },
+  reciterGlow: {
+    position: 'absolute',
+    top: -30,
+    left: '15%',
+    right: '15%',
+    height: 50,
+    borderRadius: 30,
+    backgroundColor: Colors.emerald,
+    opacity: 0.06,
+  },
+  reciterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  reciterAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.bgCard,
+    overflow: 'hidden',
+  },
+  reciterPhoto: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  reciterInfo: {
+    flex: 1,
+  },
+  reciterName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: 3,
+  },
+  reciterMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  reciterStyle: {
+    fontSize: 10,
+    color: Colors.textMuted,
+    fontWeight: '600',
+  },
+  metaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: Colors.textMuted,
+  },
+  reciterActions: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  selectedBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)',
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.emerald,
+  },
+  previewButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.bgCard,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Empty
+  emptyContainer: {
+    paddingVertical: 60,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 13,
+    color: Colors.textMuted,
+  },
+});

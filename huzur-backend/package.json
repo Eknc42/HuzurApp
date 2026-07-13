@@ -1,0 +1,25 @@
+{
+  "name": "huzur-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@google/genai": "^2.11.0",
+    "@qdrant/js-client-rest": "^1.18.0",
+    "better-sqlite3": "^12.11.1",
+    "cli-progress": "^3.12.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "ollama": "^0.6.3",
+    "p-limit": "^7.3.0",
+    "stream-json": "^3.5.0"
+  }
+}

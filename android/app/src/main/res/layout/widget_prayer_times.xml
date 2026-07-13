@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:gravity="center">
+
+    <!-- Location Header -->
+    <TextView
+        android:id="@+id/widget_location"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Konum Yükleniyor..."
+        android:textColor="#A0A0A0"
+        android:textSize="14sp"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Next Prayer Title -->
+    <TextView
+        android:id="@+id/widget_next_prayer_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="--'a Kalan Süre"
+        android:textColor="#10b981"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp" />
+
+    <!-- Countdown Timer (Chronometer) -->
+    <Chronometer
+        android:id="@+id/widget_chronometer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#FFFFFF"
+        android:textSize="32sp"
+        android:textStyle="bold"
+        android:format="%s" />
+
+    <!-- Next Prayer Target Time -->
+    <TextView
+        android:id="@+id/widget_target_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="--:--"
+        android:textColor="#A0A0A0"
+        android:textSize="14sp"
+        android:layout_marginTop="4dp" />
+
+</LinearLayout>

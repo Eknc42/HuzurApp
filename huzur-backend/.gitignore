@@ -1,0 +1,15 @@
+node_modules/
+.env
+progress.json
+
+.DS_Store
+npm-debug.log
+
+knowledge/*.zip
+knowledge/*.tar
+knowledge/knowledge_base_final.json
+checkJson.js
+inspectPoint.js
+dimension.js
+test.js
+testEmbedding.js
