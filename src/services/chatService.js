@@ -1,8 +1,8 @@
 import { Platform } from 'react-native';
 import { fetchWithRetry } from './networkService';
 
-// Fallback BASE_URL for local development if not provided via env variables.
-const BASE_URL = Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
+// Production Render URL
+const BASE_URL = 'https://huzur-ai-api.onrender.com';
 
 /**
  * Sends a message to the Hybrid RAG chat backend and returns the response.

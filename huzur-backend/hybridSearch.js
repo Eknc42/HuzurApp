@@ -9,9 +9,14 @@ const db = new Database("./knowledge/knowledge.db", {
 
 async function hybridSearch(question) {
 
-    const vector = await createEmbedding(question, "query");
-
-    const semanticResults = await search(vector, 10);
+    let semanticResults = [];
+    try {
+        // Render gibi uzak sunucularda lokal Ollama çalışmadığında kodun çökmesini önler.
+        const vector = await createEmbedding(question, "query");
+        semanticResults = await search(vector, 10);
+    } catch (e) {
+        console.warn("Semantic search skipped. Using only keyword search:", e.message);
+    }
 
     const keywordStmt = db.prepare(`
         SELECT
