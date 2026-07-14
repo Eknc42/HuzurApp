@@ -29,18 +29,18 @@ app.post('/api/chat', async (req, res) => {
 
     const answer = await askGemini(question, context, mode);
 
-    const sources = results.map(item => ({
+    let sources = results.map(item => ({
       title: item.title,
       citation: item.citation || item.title,
       type: item.type
     }));
 
-    if (mode === "general") {
-      sources.push({
+    if (mode === "general" || answer.includes("🔍")) {
+      sources = [{
         title: "Diyanet İşleri Başkanlığı",
-        citation: "Web Araması (diyanet.gov.tr)",
+        citation: "Fetva ve Kaynaklar (diyanet.gov.tr)",
         type: "web_search"
-      });
+      }];
     }
 
     return res.json({
