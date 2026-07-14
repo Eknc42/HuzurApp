@@ -98,7 +98,7 @@ async function hybridSearch(question) {
     results.sort((a, b) => b.finalScore - a.finalScore);
 
     const bestScore = results.length > 0
-        ? Math.max(...results.map(r => r.semanticScore ?? 0))
+        ? Math.max(...results.map(r => r.finalScore))
         : 0;
 
     return {

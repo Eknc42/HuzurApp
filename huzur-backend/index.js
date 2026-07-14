@@ -19,6 +19,12 @@ app.post('/api/chat', async (req, res) => {
     let mode = results.length > 0 ? "mixed" : "general";
     let context = "";
 
+    // Eğer en iyi skor çok düşükse, alakasız sonuçlar gelmiş demektir
+    if (bestScore < 0.05) {
+      mode = "general";
+      context = "";
+    }
+
     results.forEach((item) => {
       context += `Kaynak:\n${item.citation || item.title}\n\n${item.content}\n\n----------------------------------------\n`;
     });
