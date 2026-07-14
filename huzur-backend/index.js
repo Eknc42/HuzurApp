@@ -41,12 +41,18 @@ app.post('/api/chat', async (req, res) => {
       type: item.type
     }));
 
-    if (mode === "general" || answer.includes("🔍")) {
+    if (mode === "general" || (answer.includes("Diyanet") && answer.includes("derlenmiştir"))) {
       sources = [{
         title: "Diyanet İşleri Başkanlığı",
         citation: "Fetva ve Kaynaklar (diyanet.gov.tr)",
         type: "web_search"
       }];
+    } else if (answer.includes("[SEPARATOR]")) {
+      sources.push({
+        title: "Diyanet İşleri Başkanlığı",
+        citation: "Ek Bilgi (diyanet.gov.tr)",
+        type: "web_search"
+      });
     }
 
     return res.json({
