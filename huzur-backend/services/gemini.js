@@ -63,7 +63,11 @@ CRITICAL RULES:
    - Clearly cite Diyanet (e.g., "Diyanet İşleri Başkanlığı'nın açıklamasına göre...").
    - Do NOT use your own general knowledge.
    - At the very beginning of your response, write exactly: "🔍 Veritabanındaki eşleşmeler sorunuzla alakalı olmadığı için bu cevap Diyanet İşleri Başkanlığı (diyanet.gov.tr) kaynaklarından derlenmiştir."
-3. If the context DOES contain the answer, answer the question using the context and clearly cite the sources.
+3. If the context is PARTIALLY relevant and you also need to use Diyanet information to complete the answer:
+   - First, write the answer according to the provided context.
+   - Then, add exactly the word [SEPARATOR] on a new line (with spaces around it like this: " [SEPARATOR] ") to insert a visual green line.
+   - Below the separator, write the supplementary Diyanet fatwa/information.
+4. If the context DOES contain the FULL answer, answer the question using the context and clearly cite the sources. DO NOT use [SEPARATOR].
 
 Never invent Qur'an verses.
 Never invent Hadith.

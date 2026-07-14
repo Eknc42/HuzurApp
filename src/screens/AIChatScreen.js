@@ -275,7 +275,16 @@ export default function AIChatScreen({ navigation }) {
                   onComplete={() => markMessageAsOld(msg.id)} 
                 />
               ) : (
-                <Text style={isUser ? styles.userText : styles.assistantText}>{msg.text}</Text>
+                <View>
+                  {msg.text.split('[SEPARATOR]').map((part, index, arr) => (
+                    <React.Fragment key={index}>
+                      <Text style={isUser ? styles.userText : styles.assistantText}>{part.trim()}</Text>
+                      {index < arr.length - 1 && (
+                        <View style={{ height: 1, backgroundColor: '#10b981', marginVertical: 14, width: '100%' }} />
+                      )}
+                    </React.Fragment>
+                  ))}
+                </View>
               )}
             </>
           )}
