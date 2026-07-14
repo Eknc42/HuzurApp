@@ -88,8 +88,10 @@ async function hybridSearch(question) {
     // semantic skorla (0-1 cosine) karsilastirilabilir hale getiriyoruz.
     results.forEach(item => {
         const semanticNorm = item.semanticScore ?? 0;
+        // bm25 skoru negatiftir (örn: -15, -5). Daha negatif olan daha iyidir.
+        // Bunu pozitif ve yüksek olan daha iyi olacak şekilde (0-1 aralığına) normalize edelim.
         const keywordNorm = item.keywordScore != null
-            ? Math.max(0, Math.min(1, (15 + item.keywordScore) / 15))
+            ? Math.min(1, Math.abs(item.keywordScore) / 20)
             : 0;
 
         item.finalScore = (semanticNorm * 0.7) + (keywordNorm * 0.3);
