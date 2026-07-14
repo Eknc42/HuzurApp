@@ -1,9 +1,8 @@
 require("dotenv").config();
+const Groq = require("groq-sdk");
 
-const { GoogleGenAI } = require("@google/genai");
-
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
 });
 
 async function askGemini(question, context, mode = "rag") {
@@ -117,18 +116,16 @@ ${question}
   
   for (let i = 0; i < retries; i++) {
     try {
-      const response = await ai.models.generateContent({
-        model: "gemini-flash-latest",
-        contents: prompt,
+      const response = await groq.chat.completions.create({
+        messages: [{ role: "user", content: prompt }],
+        model: "llama-3.3-70b-versatile",
       });
 
-      return typeof response.text === "function"
-        ? response.text()
-        : response.text;
+      return response.choices[0]?.message?.content || "";
     } catch (error) {
       lastError = error;
-      if (error.status === 503) {
-        console.warn(`Gemini 503 Error. Retrying in ${i + 1} seconds...`);
+      if (error.status === 503 || error.status === 429) {
+        console.warn(`Groq Error. Retrying in ${i + 1} seconds...`);
         await new Promise(r => setTimeout(r, (i + 1) * 1000));
         continue;
       }
@@ -139,5 +136,5 @@ ${question}
 }
 
 module.exports = {
-  askGemini,
+  askGemini, // Kept the same exported name to avoid changing index.js
 };
