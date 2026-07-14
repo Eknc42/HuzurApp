@@ -324,3 +324,20 @@ export function RainIcon({ size = 24, color = '#f5f5f0' }) {
   );
 }
 
+
+// ============================================================
+// SHUFFLE — Random play
+// ============================================================
+export function ShuffleIcon({ size = 24, color = '#f5f5f0' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
