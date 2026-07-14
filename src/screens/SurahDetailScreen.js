@@ -42,12 +42,14 @@ import {
 import { PlayIcon, PauseIcon } from '../components/Icons';
 import { getLastReciter, saveLastReciter } from '../services/mp3quranApi';
 import { getPendingReciterSelection } from './ReciterSelectScreen';
+import { usePremium } from '../contexts/PremiumContext';
 
 const { width } = Dimensions.get('window');
 const BISMILLAH = 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ';
 
 export default function SurahDetailScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
+  const { isPremium } = usePremium();
   const { surah, autoPlay, initialVerseId } = route.params;
   const [verses, setVerses] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -412,13 +414,14 @@ export default function SurahDetailScreen({ navigation, route }) {
         </View>
 
         <TouchableOpacity
-          style={styles.audioButton}
+          style={styles.headerRightButton}
           activeOpacity={0.7}
           onPress={() => {
-            navigation.navigate('AmbientMixer');
+            const firstVerse = verses && verses.length > 0 ? verses[0] : null;
+            navigation.navigate('ReciterSelect', { surah, verse: firstVerse });
           }}
         >
-          <MixerIcon size={20} color={Colors.emerald} />
+          <HeadphonesIcon size={20} color={Colors.emerald} />
         </TouchableOpacity>
       </Animated.View>
 
@@ -595,22 +598,7 @@ export default function SurahDetailScreen({ navigation, route }) {
         />
         <View style={styles.playerBarBorder} />
 
-        {/* Reciter info */}
-        <View style={styles.playerReciterRow}>
-          <HeadphonesIcon size={14} color={Colors.emerald} />
-          <Text style={styles.playerReciterName} numberOfLines={1}>
-            {reciterName || 'Yasser Al-Dosari'}
-          </Text>
-          <TouchableOpacity
-            onPress={() => {
-              const firstVerse = verses && verses.length > 0 ? verses[0] : null;
-              navigation.navigate('ReciterSelect', { surah, verse: firstVerse });
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.playerChangeBtn}>Değiştir</Text>
-          </TouchableOpacity>
-        </View>
+
 
         {/* Track info and Slider */}
         <View style={styles.playerTrackRow}>
@@ -650,48 +638,69 @@ export default function SurahDetailScreen({ navigation, route }) {
 
         {/* Controls */}
         <View style={styles.playerControls}>
+          {/* Ambient Sounds */}
+          <TouchableOpacity 
+            onPress={() => {
+              if (isPremium) navigation.navigate('AmbientMixer');
+              else navigation.navigate('Paywall');
+            }} 
+            style={styles.actionButton} 
+            activeOpacity={0.7}
+          >
+            <MixerIcon size={24} color={Colors.emerald} />
+          </TouchableOpacity>
+
+          {/* Previous */}
           <TouchableOpacity
             onPress={() => {
               if (surah.id > 1) {
                 playTargetSurahInBackground(surah.id - 1, isPlaying);
               }
             }}
-            style={styles.playerSkipBtn}
+            style={styles.skipButton}
             activeOpacity={0.7}
           >
-            <Text style={styles.playerSkipText}>Önceki</Text>
+            <Text style={styles.skipText}>⟨⟨</Text>
           </TouchableOpacity>
 
+          {/* Play/Pause */}
           <TouchableOpacity
             onPress={() => handlePlayPause()}
-            style={styles.playerPlayBtn}
-            activeOpacity={0.8}
+            activeOpacity={0.7}
+            style={styles.playButton}
           >
-            {isPlaying && !isPaused ? (
-              <PauseIcon size={22} color="#fff" />
-            ) : (
-              <PlayIcon size={22} color="#fff" />
-            )}
+            <View style={styles.playButtonInner}>
+              {isPlaying && !isPaused ? (
+                <PauseIcon size={28} color={Colors.white} />
+              ) : (
+                <PlayIcon size={28} color={Colors.white} />
+              )}
+            </View>
           </TouchableOpacity>
 
+          {/* Next */}
           <TouchableOpacity
             onPress={() => {
               if (surah.id < 114) {
                 playTargetSurahInBackground(surah.id + 1, isPlaying);
               }
             }}
-            style={styles.playerSkipBtn}
+            style={styles.skipButton}
             activeOpacity={0.7}
           >
-            <Text style={styles.playerSkipText}>Sonraki</Text>
+            <Text style={styles.skipText}>⟩⟩</Text>
           </TouchableOpacity>
 
+          {/* Sleep Mode */}
           <TouchableOpacity
-            onPress={() => navigation.navigate('SleepMode')}
-            style={styles.playerMoonBtn}
+            onPress={() => {
+              if (isPremium) navigation.navigate('SleepMode');
+              else navigation.navigate('Paywall');
+            }}
+            style={styles.actionButton}
             activeOpacity={0.7}
           >
-            <MoonIcon size={18} color={Colors.amber} />
+            <MoonIcon size={24} color={Colors.emerald} />
           </TouchableOpacity>
         </View>
       </View>
@@ -739,7 +748,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontWeight: '400',
   },
-  audioButton: {
+  headerRightButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -963,23 +972,7 @@ const styles = StyleSheet.create({
   playerBarBorder: {
     ...StyleSheet.absoluteFillObject,
   },
-  playerReciterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-    gap: 8,
-  },
-  playerReciterName: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textPrimary,
-  },
-  playerChangeBtn: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.emerald,
-  },
+
   playerTrackRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1047,36 +1040,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 20,
+    marginTop: 4,
   },
-  playerSkipBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+  actionButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(16,185,129,0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  playerSkipText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.textMuted,
-  },
-  playerPlayBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: Colors.emerald,
+    borderColor: 'rgba(16,185,129,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
-    ...Shadows.md,
   },
-  playerMoonBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,191,0,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,191,0,0.15)',
+  skipButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  skipText: {
+    fontSize: 24,
+    color: Colors.textSecondary,
+    fontWeight: '300',
+  },
+  playButton: {
+    ...Shadows.glowEmerald,
+  },
+  playButtonInner: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: Colors.emeraldDark,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -13,9 +13,10 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Spacing, Radius, Shadows } from '../theme/colors';
-import { PlayIcon, PauseIcon } from '../components/Icons';
-import { HeadphonesIcon } from '../components/IconsExtra';
+import { PlayIcon, PauseIcon, StarIcon, HeartIcon } from '../components/Icons';
+import { UserIcon, WidgetIcon } from '../components/IconsExtra';
 import ScreenContainer from '../components/ScreenContainer';
 import Header from '../components/Header';
 import {
@@ -42,8 +43,9 @@ export function getPendingReciterSelection() {
 }
 
 const TABS = [
-  { id: 'featured', label: '⭐ Öne Çıkan' },
-  { id: 'all',      label: '📋 Tümü' },
+  { id: 'featured', label: 'Öne Çıkan', icon: StarIcon },
+  { id: 'favorites', label: 'Favoriler', icon: HeartIcon },
+  { id: 'all',      label: 'Tümü',      icon: WidgetIcon },
 ];
 
 export default function ReciterSelectScreen({ navigation, route }) {
@@ -55,12 +57,14 @@ export default function ReciterSelectScreen({ navigation, route }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('featured');
   const [loading, setLoading] = useState(true);
+  const [favorites, setFavorites] = useState([]);
 
   // Animations
   const headerOpacity = useRef(new Animated.Value(0)).current;
   const listOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    loadFavorites();
     loadReciters();
 
     Animated.sequence([
@@ -79,11 +83,44 @@ export default function ReciterSelectScreen({ navigation, route }) {
   useEffect(() => {
     filterReciters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allReciters, searchQuery, activeTab]);
+  }, [allReciters, searchQuery, activeTab, favorites]);
+
+  const loadFavorites = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('@favorite_reciters');
+      if (stored) {
+        setFavorites(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.warn('Favoriler yüklenemedi:', e);
+    }
+  };
+
+  const toggleFavorite = async (id) => {
+    try {
+      const newFavs = favorites.includes(id)
+        ? favorites.filter(fId => fId !== id)
+        : [...favorites, id];
+      
+      setFavorites(newFavs);
+      await AsyncStorage.setItem('@favorite_reciters', JSON.stringify(newFavs));
+    } catch (e) {
+      console.warn('Favori kaydedilemedi:', e);
+    }
+  };
 
   const loadReciters = async () => {
     try {
       const data = await getReciters();
+      
+      // Fetch known static photos for popular reciters
+      const staticPhotos = {};
+      STATIC_RECITERS.forEach(r => {
+        if (r.qdcId && r.photo) {
+          staticPhotos[r.qdcId] = r.photo;
+        }
+      });
+
       // Annotate each reciter with a QDC id (if any) and keep ONLY those
       // that have a QDC equivalent — these are the reciters whose audio can
       // be perfectly synced with verse highlighting.
@@ -92,7 +129,8 @@ export default function ReciterSelectScreen({ navigation, route }) {
         .filter(r => r.moshaf && r.moshaf.length > 0)
         .map(r => {
           const qdcId = findQdcMatch(r.name || '', r.letter || '');
-          return { ...r, qdcId, photo: null };
+          const photo = qdcId && staticPhotos[qdcId] ? staticPhotos[qdcId] : null;
+          return { ...r, qdcId, photo };
         })
         .filter(r => r.qdcId !== null)
         .filter(r => {
@@ -142,6 +180,8 @@ export default function ReciterSelectScreen({ navigation, route }) {
 
     if (activeTab === 'featured') {
       list = getFeaturedReciters(allReciters);
+    } else if (activeTab === 'favorites') {
+      list = allReciters.filter(r => favorites.includes(r.id));
     }
 
     if (searchQuery.trim()) {
@@ -215,6 +255,7 @@ export default function ReciterSelectScreen({ navigation, route }) {
     const surahCount = moshaf?.surah_total || 0;
     const moshafCount = item.moshaf?.length || 0;
     const accentColor = isSelected ? Colors.emerald : Colors.textMuted;
+    const isFav = favorites.includes(item.id);
 
     return (
       <TouchableOpacity
@@ -246,7 +287,7 @@ export default function ReciterSelectScreen({ navigation, route }) {
                   defaultSource={undefined}
                 />
               ) : (
-                <HeadphonesIcon
+                <UserIcon
                   size={20}
                   color={accentColor}
                 />
@@ -274,6 +315,17 @@ export default function ReciterSelectScreen({ navigation, route }) {
 
             {/* Actions */}
             <View style={styles.reciterActions}>
+              <TouchableOpacity
+                onPress={() => toggleFavorite(item.id)}
+                style={styles.favButton}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <HeartIcon 
+                  size={20} 
+                  color={isFav ? Colors.emerald : Colors.textMuted} 
+                  filled={isFav} 
+                />
+              </TouchableOpacity>
               {isSelected && (
                 <View style={styles.selectedBadge}>
                   <Text style={styles.selectedText}>✓</Text>
@@ -297,7 +349,7 @@ export default function ReciterSelectScreen({ navigation, route }) {
         </View>
       </TouchableOpacity>
     );
-  }, [selectedId, playingId, handleSelect, togglePreview]);
+  }, [selectedId, playingId, handleSelect, togglePreview, favorites]);
 
   return (
     <ScreenContainer gradient={true}>
@@ -338,7 +390,8 @@ export default function ReciterSelectScreen({ navigation, route }) {
               styles.tabLabel,
               activeTab === tab.id && styles.tabLabelActive,
             ]}>
-              {tab.label}
+              <tab.icon size={14} color={activeTab === tab.id ? Colors.white : Colors.textMuted} filled={activeTab === tab.id} />
+              {'  '}{tab.label}
             </Text>
           </TouchableOpacity>
         ))}
@@ -355,6 +408,7 @@ export default function ReciterSelectScreen({ navigation, route }) {
           <FlatList
             data={displayList}
             keyExtractor={(item) => `${item.id}`}
+            extraData={favorites}
             renderItem={renderReciterItem}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
@@ -375,45 +429,43 @@ const styles = StyleSheet.create({
   // Search
   searchContainer: {
     paddingHorizontal: Spacing.xl,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   searchInput: {
-    backgroundColor: Colors.bgCard,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.borderSubtle,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: Radius.full,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    fontSize: 15,
     color: Colors.textPrimary,
   },
 
   // Tabs
   tabRow: {
     flexDirection: 'row',
-    paddingHorizontal: Spacing.xl,
-    marginBottom: 14,
-    gap: 8,
+    marginHorizontal: Spacing.xl,
+    marginBottom: 16,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: Radius.lg,
+    padding: 4,
   },
   tab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: Colors.borderSubtle,
-    backgroundColor: Colors.bgCard,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: Radius.md,
   },
   tabActive: {
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    borderColor: 'rgba(16, 185, 129, 0.25)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   tabLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: Colors.textMuted,
   },
   tabLabelActive: {
-    color: Colors.emerald,
+    color: Colors.white,
   },
 
   // Loading
@@ -436,56 +488,51 @@ const styles = StyleSheet.create({
 
   // Reciter card
   reciterCard: {
-    marginBottom: 10,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
   reciterInner: {
-    backgroundColor: Colors.bgCard,
-    borderRadius: Radius.xl,
-    borderWidth: 1,
-    borderColor: Colors.borderSubtle,
-    padding: 16,
-    overflow: 'hidden',
-    position: 'relative',
-    ...Shadows.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   reciterGlow: {
     position: 'absolute',
-    top: -30,
-    left: '15%',
-    right: '15%',
-    height: 50,
-    borderRadius: 30,
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: Colors.emerald,
-    opacity: 0.06,
+    opacity: 0.05,
   },
   reciterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    flex: 1,
+    gap: 16,
   },
   reciterAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1.5,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.bgCard,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     overflow: 'hidden',
+    borderWidth: 1.5,
   },
   reciterPhoto: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: '100%',
+    height: '100%',
   },
   reciterInfo: {
     flex: 1,
   },
   reciterName: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
     color: Colors.textPrimary,
-    marginBottom: 3,
+    marginBottom: 4,
   },
   reciterMeta: {
     flexDirection: 'row',
@@ -493,9 +540,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   reciterStyle: {
-    fontSize: 10,
+    fontSize: 12,
     color: Colors.textMuted,
-    fontWeight: '600',
+    fontWeight: '400',
   },
   metaDot: {
     width: 3,
@@ -505,7 +552,11 @@ const styles = StyleSheet.create({
   },
   reciterActions: {
     alignItems: 'center',
-    gap: 8,
+    flexDirection: 'row',
+    gap: 12,
+  },
+  favButton: {
+    padding: 4,
   },
   selectedBadge: {
     width: 24,

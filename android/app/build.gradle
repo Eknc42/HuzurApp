@@ -82,8 +82,8 @@ android {
         applicationId "com.huzurquran.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 8
-        versionName "1.4.4"
+        versionCode 12
+        versionName "1.4.8"
     }
     signingConfigs {
         debug {

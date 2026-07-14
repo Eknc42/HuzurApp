@@ -12,8 +12,8 @@ import {
 } from 'react-native';
 import { Colors, Radius } from '../theme/colors';
 import { Typography } from '../theme/typography';
-import { PauseIcon, PlayIcon, CrescentIcon } from '../components/Icons';
-import { MoonIcon } from '../components/IconsExtra';
+import { PauseIcon, PlayIcon, CrescentIcon, WaveIcon } from '../components/Icons';
+import { MoonIcon, RainIcon } from '../components/IconsExtra';
 import ScreenContainer from '../components/ScreenContainer';
 import Header, { HeaderIconButton } from '../components/Header';
 import { 
@@ -270,17 +270,20 @@ export default function SleepModeScreen({ navigation }) {
       <Animated.View style={[styles.bottomControls, { opacity: controlsOpacity }]}>
         {/* Ambient selector */}
         <View style={styles.ambientRow}>
-          {['🌧️', '🌊', '🌙'].map((icon, i) => {
-            const ids = ['rain', 'ocean', 'night'];
-            const isActive = ambientActive === ids[i];
+          {[
+            { id: 'rain', Icon: RainIcon },
+            { id: 'ocean', Icon: WaveIcon },
+            { id: 'night', Icon: MoonIcon }
+          ].map(({ id, Icon }) => {
+            const isActive = ambientActive === id;
             return (
               <TouchableOpacity
-                key={ids[i]}
-                onPress={() => setAmbientActive(isActive ? null : ids[i])}
+                key={id}
+                onPress={() => setAmbientActive(isActive ? null : id)}
                 style={[styles.ambientChip, isActive && styles.ambientChipActive]}
                 activeOpacity={0.7}
               >
-                <Text style={styles.ambientIcon}>{icon}</Text>
+                <Icon size={20} color={isActive ? Colors.emerald : 'rgba(255,255,255,0.4)'} />
               </TouchableOpacity>
             );
           })}

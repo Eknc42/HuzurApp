@@ -2,10 +2,7 @@
 // 5 ünlü Kur'an okuyucusu — AlQuran Cloud ses CDN tanımlayıcıları
 // Fotoğraflar: QuranCDN API (api.qurancdn.com) — qdcId ile eşleştirilmiştir
 
-// QuranCDN CDN'inden fotoğraf URL'i üret
-const QDC_PHOTO_BASE = 'https://cdn.qurancdn.com/images/reciters';
-const qdcPhoto = (qdcId, slug) =>
-  `${QDC_PHOTO_BASE}/${qdcId}/${slug}-profile.jpeg`;
+
 
 export const RECITERS = [
   {
@@ -20,7 +17,7 @@ export const RECITERS = [
     audioBaseUrl: 'https://server7.mp3quran.net/basit',
     color: '#d4a574',
     qdcId: 2,
-    photo: qdcPhoto(2, 'abdul-baset-abdul-samad'),
+    photo: null,
   },
   {
     id: 'alafasy',
@@ -34,7 +31,7 @@ export const RECITERS = [
     audioBaseUrl: 'https://server8.mp3quran.net/afs',
     color: '#10b981',
     qdcId: 7,
-    photo: qdcPhoto(7, 'mishari-rashid-al-afasy'),
+    photo: null,
   },
   {
     id: 'sudais',
@@ -48,7 +45,7 @@ export const RECITERS = [
     audioBaseUrl: 'https://server11.mp3quran.net/sds',
     color: '#60a5fa',
     qdcId: 3,
-    photo: qdcPhoto(3, 'abdurrahman-as-sudais'),
+    photo: null,
   },
   {
     id: 'shatri',
@@ -62,7 +59,7 @@ export const RECITERS = [
     audioBaseUrl: 'https://server11.mp3quran.net/shatri',
     color: '#a78bfa',
     qdcId: 4,
-    photo: qdcPhoto(4, 'abu-bakr-al-shatri'),
+    photo: null,
   },
   {
     id: 'rifai',
@@ -76,7 +73,7 @@ export const RECITERS = [
     audioBaseUrl: 'https://server8.mp3quran.net/hani',
     color: '#f59e0b',
     qdcId: 5,
-    photo: qdcPhoto(5, 'hani-ar-rifai'),
+    photo: null,
   },
   {
     id: 'husary',
@@ -90,7 +87,7 @@ export const RECITERS = [
     audioBaseUrl: 'https://server13.mp3quran.net/husr',
     color: '#ec4899',
     qdcId: 6,
-    photo: qdcPhoto(6, 'mahmoud-khalil-al-husary'),
+    photo: null,
   },
   {
     id: 'minshawi',
@@ -104,7 +101,7 @@ export const RECITERS = [
     audioBaseUrl: 'https://server10.mp3quran.net/minsh',
     color: '#14b8a6',
     qdcId: 9,
-    photo: qdcPhoto(9, 'mohamed-siddiq-al-minshawi'),
+    photo: null,
   },
   {
     id: 'shuraim',
@@ -118,7 +115,7 @@ export const RECITERS = [
     audioBaseUrl: 'https://server12.mp3quran.net/shoraimy',
     color: '#8b5cf6',
     qdcId: 10,
-    photo: qdcPhoto(10, 'saud-ash-shuraim'),
+    photo: null,
   },
   {
     id: 'dosari',
@@ -132,7 +129,7 @@ export const RECITERS = [
     audioBaseUrl: 'https://server11.mp3quran.net/yasser',
     color: '#fb7185',
     qdcId: 97,
-    photo: qdcPhoto(97, 'yasser-ad-dussary'),
+    photo: null,
   },
   {
     id: 'tunaiji',
@@ -146,7 +143,7 @@ export const RECITERS = [
     audioBaseUrl: 'https://server12.mp3quran.net/tnjy',
     color: '#0ea5e9',
     qdcId: 161,
-    photo: qdcPhoto(161, 'khalifah-al-tunaiji'),
+    photo: null,
   },
   {
     id: 'turki',

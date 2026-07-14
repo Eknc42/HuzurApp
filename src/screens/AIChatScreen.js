@@ -10,35 +10,138 @@ import {
   Platform,
   ActivityIndicator,
   Keyboard,
+  Alert,
+  Modal,
+  Pressable
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../theme/colors';
 import ScreenContainer from '../components/ScreenContainer';
 import Header from '../components/Header';
-import { SparkleIcon, CrescentIcon } from '../components/Icons';
+import { SparkleIcon } from '../components/Icons';
+import { ClockIcon, PlusIcon, TrashIcon } from '../components/IconsExtra';
 import { sendChatMessage } from '../services/chatService';
-import { getSurahById } from '../data/surahs';
 import AnimatedText from '../components/AnimatedText';
 import { getNetworkStatus } from '../services/networkService';
 
+const SESSIONS_KEY = '@ai_chat_sessions';
+const MSG_KEY_PREFIX = '@ai_chat_msgs_';
+
+const DEFAULT_WELCOME_MESSAGE = {
+  id: 'welcome',
+  role: 'assistant',
+  text: 'Selamün Aleyküm. Ben Huzur AI. Size İslam ve Kur\'an hakkında nasıl yardımcı olabilirim?',
+  sources: [
+    { type: 'info', title: 'Kur\'an-ı Kerim', citation: 'Diyanet Meali' },
+    { type: 'info', title: 'Sahih Hadisler', citation: 'Kütüb-i Sitte' },
+    { type: 'info', title: 'Temel İlmihal', citation: 'Diyanet İlmihali' }
+  ]
+};
+
 export default function AIChatScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const [messages, setMessages] = useState([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      text: 'Selamün Aleyküm. Ben Huzur AI. Size İslam ve Kur\'an hakkında nasıl yardımcı olabilirim?',
-      sources: [
-        { type: 'info', title: 'Kur\'an-ı Kerim', citation: 'Diyanet Meali' },
-        { type: 'info', title: 'Sahih Hadisler', citation: 'Kütüb-i Sitte' },
-        { type: 'info', title: 'Temel İlmihal', citation: 'Diyanet İlmihali' }
-      ]
-    }
-  ]);
+  
+  // Chat State
+  const [messages, setMessages] = useState([DEFAULT_WELCOME_MESSAGE]);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
+  const [sessions, setSessions] = useState([]); // [{id, title, date}]
+  
+  // UI State
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingText, setLoadingText] = useState('Düşünüyor...');
+  const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  
   const scrollViewRef = useRef(null);
+
+  useEffect(() => {
+    loadSessions();
+  }, []);
+
+  // Save messages whenever they change, if we have a session
+  useEffect(() => {
+    if (isInitialLoadDone && currentSessionId) {
+      saveMessages(currentSessionId, messages);
+    }
+  }, [messages, isInitialLoadDone, currentSessionId]);
+
+  // Loading animation cycle
+  useEffect(() => {
+    let interval;
+    if (isLoading) {
+      const loadingMessages = [
+        'Düşünüyor...',
+        'Kur\'an meali taranıyor...',
+        'Sahih kaynaklar inceleniyor...',
+        'Cevap derleniyor...',
+        'Son rütuşlar yapılıyor...'
+      ];
+      let i = 0;
+      setLoadingText(loadingMessages[0]);
+      interval = setInterval(() => {
+        i = (i + 1) % loadingMessages.length;
+        setLoadingText(loadingMessages[i]);
+      }, 1800);
+    }
+    return () => clearInterval(interval);
+  }, [isLoading]);
+
+  const loadSessions = async () => {
+    try {
+      const storedSessions = await AsyncStorage.getItem(SESSIONS_KEY);
+      if (storedSessions) {
+        const parsed = JSON.parse(storedSessions);
+        setSessions(parsed);
+        // Load the most recent session by default if exists
+        if (parsed.length > 0) {
+          await loadChat(parsed[0].id);
+        } else {
+          setIsInitialLoadDone(true);
+        }
+      } else {
+        setIsInitialLoadDone(true);
+      }
+    } catch (e) {
+      console.warn('Oturumlar yüklenemedi:', e);
+      setIsInitialLoadDone(true);
+    }
+  };
+
+  const loadChat = async (sessionId) => {
+    try {
+      const storedMsgs = await AsyncStorage.getItem(MSG_KEY_PREFIX + sessionId);
+      if (storedMsgs) {
+        const parsed = JSON.parse(storedMsgs);
+        // disable animations for old messages
+        const loadedMessages = parsed.map(m => ({ ...m, isNew: false }));
+        setMessages(loadedMessages);
+        setCurrentSessionId(sessionId);
+      }
+    } catch (e) {
+      console.warn('Mesajlar yüklenemedi:', e);
+    } finally {
+      setIsInitialLoadDone(true);
+      setModalVisible(false);
+    }
+  };
+
+  const saveMessages = async (sessionId, msgs) => {
+    try {
+      const msgsToSave = msgs.filter(m => m.role !== 'error');
+      await AsyncStorage.setItem(MSG_KEY_PREFIX + sessionId, JSON.stringify(msgsToSave));
+    } catch (e) {
+      console.warn('Mesajlar kaydedilemedi:', e);
+    }
+  };
+
+  const startNewChat = () => {
+    setCurrentSessionId(null);
+    setMessages([DEFAULT_WELCOME_MESSAGE]);
+    setModalVisible(false);
+  };
 
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -50,8 +153,29 @@ export default function AIChatScreen({ navigation }) {
     const userMessageId = Date.now().toString();
     const newUserMsg = { id: userMessageId, role: 'user', text: question };
     
-    setMessages(prev => [...prev, newUserMsg]);
+    // Check if this is the first real message in a new session
+    let activeSessionId = currentSessionId;
+    let newMessages = [...messages, newUserMsg];
+    
+    setMessages(newMessages);
     setIsLoading(true);
+
+    if (!activeSessionId) {
+      // Create new session
+      activeSessionId = 'session_' + Date.now();
+      const newSession = {
+        id: activeSessionId,
+        title: question.substring(0, 30) + (question.length > 30 ? '...' : ''),
+        date: new Date().toISOString()
+      };
+      const updatedSessions = [newSession, ...sessions];
+      setSessions(updatedSessions);
+      setCurrentSessionId(activeSessionId);
+      
+      try {
+        await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify(updatedSessions));
+      } catch (e) {}
+    }
 
     try {
       if (!getNetworkStatus()) {
@@ -66,18 +190,18 @@ export default function AIChatScreen({ navigation }) {
           role: 'assistant',
           text: response.answer,
           sources: response.sources || [],
-          isNew: true, // Used for typing animation flag
+          isNew: true,
         };
         setMessages(prev => [...prev, assistantMsg]);
       } else {
-        throw new Error('Yanıt alınamadı.');
+        throw new Error(response?.error || 'Yanıt alınamadı.');
       }
     } catch (error) {
       const errorMsg = {
         id: (Date.now() + 2).toString(),
         role: 'error',
         text: error.message || 'Bir hata oluştu. Lütfen tekrar deneyin.',
-        originalQuestion: question, // For retry
+        originalQuestion: question,
       };
       setMessages(prev => [...prev, errorMsg]);
     } finally {
@@ -85,45 +209,33 @@ export default function AIChatScreen({ navigation }) {
     }
   };
 
-  const handleRetry = (question) => {
-    setInputValue(question);
-    // Remove the last error message
-    setMessages(prev => prev.filter(m => m.role !== 'error'));
-  };
-
-  const handleSourcePress = (source) => {
-    if (source.type === 'quran_verse') {
-      try {
-        // e.g., "Bakara 43" or "Ali Imran 15"
-        const parts = source.citation.trim().split(' ');
-        const possibleVerseId = parseInt(parts[parts.length - 1], 10);
-        
-        let targetSurah = null;
-        let targetVerseId = null;
-
-        if (!isNaN(possibleVerseId)) {
-          targetVerseId = possibleVerseId;
-          const possibleName = parts.slice(0, parts.length - 1).join(' ').trim();
-          
-          // Match surah by name using getSurahById (inexact match logic)
-          // We'll import SURAHS directly since searchSurahs is better but might not be imported
-          const { searchSurahs } = require('../data/surahs');
-          const results = searchSurahs(possibleName);
-          
-          if (results && results.length > 0) {
-            targetSurah = results[0];
+  const deleteSession = (sessionId) => {
+    Alert.alert(
+      "Sohbeti Sil",
+      "Bu sohbet kalıcı olarak silinecek. Onaylıyor musunuz?",
+      [
+        { text: "İptal", style: "cancel" },
+        { 
+          text: "Sil", 
+          style: "destructive", 
+          onPress: async () => {
+            const updatedSessions = sessions.filter(s => s.id !== sessionId);
+            setSessions(updatedSessions);
+            await AsyncStorage.setItem(SESSIONS_KEY, JSON.stringify(updatedSessions));
+            await AsyncStorage.removeItem(MSG_KEY_PREFIX + sessionId);
+            
+            if (currentSessionId === sessionId) {
+              startNewChat();
+            }
           }
         }
+      ]
+    );
+  };
 
-        if (targetSurah) {
-          navigation.navigate('SurahDetail', { surah: targetSurah, initialVerseId: targetVerseId });
-        } else {
-          navigation.navigate('Quran', { animation: 'slide_from_right' });
-        }
-      } catch (error) {
-        navigation.navigate('Quran', { animation: 'slide_from_right' });
-      }
-    }
+  const handleRetry = (question) => {
+    setInputValue(question);
+    setMessages(prev => prev.filter(m => m.role !== 'error'));
   };
 
   const markMessageAsOld = (id) => {
@@ -168,26 +280,17 @@ export default function AIChatScreen({ navigation }) {
             </>
           )}
 
-          {/* Sources */}
           {msg.sources && msg.sources.length > 0 && (
             <View style={styles.sourcesContainer}>
               <View style={styles.sourcesDivider} />
               <Text style={styles.sourcesTitle}>Kaynaklar</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sourcesScroll}>
+              <View style={styles.sourcesList}>
                 {msg.sources.map((src, idx) => (
-                  <TouchableOpacity 
-                    key={idx} 
-                    style={styles.sourceChip}
-                    onPress={() => handleSourcePress(src)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.sourceChipIcon}>
-                      {src.type === 'quran_verse' ? '📖' : '📚'}
-                    </Text>
-                    <Text style={styles.sourceChipText}>{src.title}</Text>
-                  </TouchableOpacity>
+                  <Text key={idx} style={styles.sourceTextItem}>
+                    {src.type === 'quran_verse' ? '📖' : '📚'} {src.title}{src.citation ? ` - ${src.citation}` : ''}
+                  </Text>
                 ))}
-              </ScrollView>
+              </View>
             </View>
           )}
         </View>
@@ -204,6 +307,16 @@ export default function AIChatScreen({ navigation }) {
           <View style={styles.headerCenter}>
             <SparkleIcon size={18} color={Colors.emerald} />
             <Text style={styles.headerTitle}>AI Asistan</Text>
+          </View>
+        }
+        rightActions={
+          <View style={styles.headerActions}>
+            <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.headerBtn}>
+              <ClockIcon size={22} color={Colors.textMuted} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={startNewChat} style={styles.headerBtn}>
+              <PlusIcon size={22} color={Colors.emerald} />
+            </TouchableOpacity>
           </View>
         }
       />
@@ -229,7 +342,7 @@ export default function AIChatScreen({ navigation }) {
               </View>
               <View style={[styles.messageBubble, styles.assistantBubble, styles.typingBubble]}>
                  <ActivityIndicator size="small" color={Colors.emerald} />
-                 <Text style={styles.typingText}>Düşünüyor...</Text>
+                 <Text style={styles.typingText}>{loadingText}</Text>
               </View>
             </View>
           )}
@@ -260,6 +373,64 @@ export default function AIChatScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* History Modal */}
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setModalVisible(false)} />
+          
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Sohbet Geçmişi</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalCloseBtn}>
+                <Text style={styles.modalCloseText}>Kapat</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
+              <TouchableOpacity style={styles.newChatModalBtn} onPress={startNewChat}>
+                <PlusIcon size={20} color={Colors.emerald} />
+                <Text style={styles.newChatModalText}>Yeni Sohbet Başlat</Text>
+              </TouchableOpacity>
+
+              {sessions.length === 0 ? (
+                <View style={styles.emptyHistory}>
+                  <Text style={styles.emptyHistoryText}>Henüz kayıtlı bir sohbetiniz yok.</Text>
+                </View>
+              ) : (
+                sessions.map(session => {
+                  const isActive = currentSessionId === session.id;
+                  return (
+                    <TouchableOpacity
+                      key={session.id}
+                      style={[styles.sessionItem, isActive && styles.sessionItemActive]}
+                      onPress={() => loadChat(session.id)}
+                    >
+                      <View style={styles.sessionItemLeft}>
+                        <Text style={[styles.sessionTitle, isActive && styles.sessionTitleActive]} numberOfLines={1}>
+                          {session.title}
+                        </Text>
+                        <Text style={styles.sessionDate}>
+                          {new Date(session.date).toLocaleDateString('tr-TR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </Text>
+                      </View>
+                      
+                      <TouchableOpacity onPress={() => deleteSession(session.id)} style={styles.deleteSessionBtn}>
+                        <TrashIcon size={18} color={Colors.danger} />
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -275,6 +446,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.emerald,
     letterSpacing: 0.3,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  headerBtn: {
+    padding: 6,
   },
   keyboardView: {
     flex: 1,
@@ -391,28 +570,14 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 8,
   },
-  sourcesScroll: {
-    flexDirection: 'row',
+  sourcesList: {
+    flexDirection: 'column',
+    gap: 6,
   },
-  sourceChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.bgSurface,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 16,
-    marginRight: 8,
-    gap: 4,
-  },
-  sourceChipIcon: {
-    fontSize: 12,
-  },
-  sourceChipText: {
-    fontSize: 12,
+  sourceTextItem: {
+    fontSize: 13,
     color: Colors.textTertiary,
-    fontWeight: '500',
+    lineHeight: 20,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -459,4 +624,115 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.bgSurface,
     borderColor: Colors.borderSubtle,
   },
+  
+  /* Modal Styles */
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  modalContent: {
+    backgroundColor: '#0a100d',
+    borderTopLeftRadius: Radius.xxl,
+    borderTopRightRadius: Radius.xxl,
+    minHeight: '60%',
+    maxHeight: '85%',
+    borderWidth: 1,
+    borderColor: Colors.emeraldBorder,
+    borderBottomWidth: 0,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  modalCloseBtn: {
+    padding: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: Radius.md,
+  },
+  modalCloseText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  modalScroll: {
+    padding: Spacing.xl,
+    paddingTop: 16,
+  },
+  newChatModalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderWidth: 1,
+    borderColor: Colors.emeraldBorder,
+    borderRadius: Radius.lg,
+    paddingVertical: 14,
+    marginBottom: 24,
+    gap: 8,
+  },
+  newChatModalText: {
+    color: Colors.emerald,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  emptyHistory: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyHistoryText: {
+    color: Colors.textMuted,
+    fontSize: 14,
+  },
+  sessionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.03)',
+  },
+  sessionItemActive: {
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderRadius: Radius.md,
+    paddingHorizontal: 12,
+    marginLeft: -12,
+    marginRight: -12,
+  },
+  sessionItemLeft: {
+    flex: 1,
+    paddingRight: 16,
+  },
+  sessionTitle: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: Colors.textSecondary,
+    marginBottom: 4,
+  },
+  sessionTitleActive: {
+    color: Colors.emerald,
+    fontWeight: '700',
+  },
+  sessionDate: {
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  deleteSessionBtn: {
+    padding: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: Radius.md,
+  }
 });

@@ -28,18 +28,19 @@ import Badge from '../components/Badge';
 import ScreenContainer from '../components/ScreenContainer';
 import { DailyVerseSkeleton } from '../components/LoadingSkeleton';
 import NextPrayerWidget from '../components/NextPrayerWidget';
+import { usePremium } from '../contexts/PremiumContext';
 
 import { fetchDailyVerse } from '../utils/dailyVerse';
 import { SURAHS } from '../data/surahs';
 
 // Quick access tiles — directly route to main features
 const QUICK_ACTIONS = [
-  { id: 'quran', label: 'Kur\'an-ı Kerim', subtitle: '114 sure', color: '#10b981', screen: 'Quran', Icon: BookOpenIcon },
-  { id: 'prayer', label: 'Namaz Vakitleri', subtitle: 'Canlı sayaç', color: '#c4b5fd', screen: 'PrayerTimes', Icon: ClockIcon },
-  { id: 'radio', label: 'Radyo', subtitle: 'Canlı yayınlar', color: '#60a5fa', screen: 'Radio', Icon: RadioTowerIcon },
-  { id: 'widget', label: 'Widget', subtitle: 'Günün ayeti', color: '#f59e0b', screen: 'LockScreenWidget', Icon: WidgetIcon },
-  { id: 'guide', label: 'Rehber', subtitle: 'Ayet açıklamaları', color: '#a78bfa', screen: 'AIExplanation', Icon: CompassIcon },
   { id: 'chat', label: 'AI Asistan', subtitle: 'Sorularınızı yanıtlar', color: '#3b82f6', screen: 'AIChat', Icon: SparkleIcon },
+  { id: 'zikirmatik', label: 'Zikirmatik', subtitle: 'Zikirlerini say', color: '#f43f5e', screen: 'Zikirmatik', Icon: HeartIcon },
+  { id: 'prayer', label: 'Namaz Vakitleri', subtitle: 'Canlı sayaç', color: '#c4b5fd', screen: 'PrayerTimes', Icon: ClockIcon },
+  { id: 'qibla', label: 'Kıble', subtitle: 'Kabe yönü', color: '#f59e0b', screen: 'Qibla', Icon: CompassIcon },
+  { id: 'guide', label: 'Rehber', subtitle: 'Ayet açıklamaları', color: '#a78bfa', screen: 'AIExplanation', Icon: CompassIcon },
+  { id: 'quran', label: 'Kur\'an-ı Kerim', subtitle: '114 sure', color: '#10b981', screen: 'Quran', Icon: BookOpenIcon },
 ];
 
 // Faziletli sureler — yaygın olarak okunan sureler
@@ -59,6 +60,7 @@ function getGreeting() {
 export default function HomeScreen({ navigation }) {
   const [daily, setDaily] = useState(null);
   const greeting = getGreeting();
+  const { isPremium } = usePremium();
 
   // Animations
   const headerOpacity = useRef(new Animated.Value(0)).current;
@@ -154,6 +156,13 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  const handleQuickAction = (action) => {
+    if (action.id === 'chat' && !isPremium) {
+      navigation.navigate('Paywall');
+    } else {
+      navigation.navigate(action.screen);
+    }
+  };
 
   return (
     <ScreenContainer gradient={false} edges={['top']}>
@@ -317,7 +326,7 @@ export default function HomeScreen({ navigation }) {
               return (
                 <PressableScale
                   key={action.id}
-                  onPress={() => navigation.navigate(action.screen)}
+                  onPress={() => handleQuickAction(action)}
                   style={styles.quickCardTouch}
                   scaleValue={0.95}
                 >
@@ -337,9 +346,11 @@ export default function HomeScreen({ navigation }) {
                       <Icon size={22} color={action.color} />
                     </View>
                     <View style={styles.quickTextWrap}>
-                      <Text style={styles.quickLabel} numberOfLines={1}>
-                        {action.label}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Text style={styles.quickLabel} numberOfLines={1}>
+                          {action.label}
+                        </Text>
+                      </View>
                       <Text style={styles.quickSub} numberOfLines={1}>
                         {action.subtitle}
                       </Text>

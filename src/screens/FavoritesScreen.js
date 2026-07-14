@@ -128,27 +128,14 @@ export default function FavoritesScreen({ navigation }) {
     }
   };
 
-  const promptRemove = (item) => {
-    Alert.alert(
-      'Kaydı kaldır',
-      'Bu ayeti Kayıtlar listesinden çıkarmak ister misiniz?',
-      [
-        { text: 'Vazgeç', style: 'cancel' },
-        {
-          text: 'Kaldır',
-          style: 'destructive',
-          onPress: async () => {
-            if (item.type === 'quran') {
-              await toggleBookmark(item.surahId, item.verseId);
-            } else {
-              await toggleMoodFavorite(item.mood.id, item.verse);
-            }
-            await reload();
-            showToast('Ayet kaydı kaldırıldı', 'info');
-          },
-        },
-      ],
-    );
+  const handleRemove = async (item) => {
+    if (item.type === 'quran') {
+      await toggleBookmark(item.surahId, item.verseId);
+    } else {
+      await toggleMoodFavorite(item.mood.id, item.verse);
+    }
+    await reload();
+    showToast('Ayet kaydı kaldırıldı', 'info');
   };
 
   return (
@@ -206,17 +193,22 @@ export default function FavoritesScreen({ navigation }) {
             <TouchableOpacity
                 key={item.verse.id}
                 onPress={() => handleVersePress(item)}
-                onLongPress={() => promptRemove(item)}
-                delayLongPress={380}
                 activeOpacity={0.8}
                 style={styles.verseCard}
               >
                 <View style={[styles.verseCardInner, { borderColor: `${item.mood.color}15` }]}>
                   {/* Top row */}
-                  <View style={[styles.cardTopRow, { justifyContent: 'flex-end' }]}>
+                  <View style={[styles.cardTopRow, { justifyContent: 'space-between' }]}>
                     <Text style={styles.surahRef}>
                       {item.verse.surahTr} · {item.verse.ayah}
                     </Text>
+                    <TouchableOpacity
+                      onPress={() => handleRemove(item)}
+                      hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                      style={styles.removeBtn}
+                    >
+                      <BookmarkIcon size={16} color={item.mood.color} filled={true} />
+                    </TouchableOpacity>
                   </View>
 
                   {/* Arabic text */}
@@ -353,10 +345,15 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   surahRef: {
-    fontSize: 11,
-    color: Colors.textTertiary,
+    fontSize: 12,
+    color: Colors.emerald,
     fontWeight: '700',
     letterSpacing: 0.6,
+  },
+  removeBtn: {
+    padding: 4,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 8,
   },
   arabicText: {
     fontSize: 19,

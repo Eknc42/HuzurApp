@@ -301,5 +301,16 @@ export function SkipPreviousIcon({ size = 24, color = '#f5f5f0' }) {
   );
 }
 
-
-
+// ============================================================
+// KAABA ICON
+// ============================================================
+export function KaabaIcon({ size = 24, color = '#10b981' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="11" stroke={color} strokeWidth="1.5" fill="#000" />
+      <Rect x="7.5" y="7.5" width="9" height="9" rx="1" fill={color} />
+      <Line x1="7.5" y1="10.5" x2="16.5" y2="10.5" stroke="#000" strokeWidth="1" />
+      <Path d="M11.5 13.5h2v3h-2z" fill="#000" />
+    </Svg>
+  );
+}

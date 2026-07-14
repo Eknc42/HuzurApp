@@ -119,6 +119,7 @@ export function safeIsLoaded(sound) {
 
 // Verse tracking
 let currentPlayingContext = null; // { surahId, verses, isPlaying }
+let activeSurahId = null; // Eklendi: Oynatılan son sure kimliğini tutar
 let verseTrackingInterval = null;
 let verseChangeSubscribers = [];
 let audioControlSubscribers = [];
@@ -244,6 +245,8 @@ export function playRecitation(surahId, verseId, reciterId = 'ar.alafasy', callb
   stopRadio();
   stopRecitation();
 
+  activeSurahId = surahId;
+
   const url = getVerseAudioUrl(surahId, verseId, reciterId);
   const soundId = `recitation_${surahId}_${verseId}`;
 
@@ -315,6 +318,8 @@ export function playRecitation(surahId, verseId, reciterId = 'ar.alafasy', callb
 export function playSurahFromServer(serverUrl, surahId, callbacks = {}, _retryCount = 0) {
   stopRadio();
   stopRecitation();
+
+  activeSurahId = surahId;
 
   const paddedId = String(surahId).padStart(3, '0');
   const url = `${serverUrl}${paddedId}.mp3`;
@@ -476,13 +481,14 @@ export function stopRecitation() {
   recitationSound = null;
 
   // Update notification to show stopped state
-  const surahId = currentPlayingContext?.surahId;
+  const surahId = activeSurahId || currentPlayingContext?.surahId;
   updateForegroundNotification('Kur\'an Dinle', 'Durduruldu', {
     mediaType: 'quran',
     canSkipNext: surahId ? surahId < 114 : false,
     canSkipPrev: surahId ? surahId > 1 : false,
     isPlaying: false,
   });
+  activeSurahId = null;
 }
 
 /**
@@ -502,7 +508,7 @@ export function pauseRecitation() {
     try {
       recitationSound.pause();
       // Update notification to show paused state
-      const surahId = currentPlayingContext?.surahId;
+      const surahId = activeSurahId || currentPlayingContext?.surahId;
       updateForegroundNotification('Kur\'an Dinle', 'Duraklatıldı', {
         mediaType: 'quran',
         canSkipNext: surahId ? surahId < 114 : false,
@@ -553,7 +559,7 @@ export function resumeRecitation() {
     });
     startLivenessWatchdog();
     // Update notification to show playing state
-    const surahId = currentPlayingContext?.surahId;
+    const surahId = activeSurahId || currentPlayingContext?.surahId;
     updateForegroundNotification('Kur\'an Dinle', 'Çalıyor', {
       mediaType: 'quran',
       canSkipNext: surahId ? surahId < 114 : true,
@@ -938,6 +944,7 @@ export async function playSurahFromServerWithVerseTracking(
   stopRecitation();
   stopVerseTracking();
   isAudioLoading = true;
+  activeSurahId = surahId;
 
   // Android: Foreground service başlat
   const surahName = getSurahById(surahId)?.nameTr || `${surahId}.`;

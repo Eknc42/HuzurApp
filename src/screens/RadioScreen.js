@@ -169,6 +169,7 @@ export default function RadioScreen({ navigation }) {
     });
 
     return () => {
+      stopRadio(); // Sayfa unmount olduğunda da radyoyu durdurmayı garanti eder
       isMountedRef.current = false;
       unsubscribeBlur();
     };
@@ -316,12 +317,11 @@ export default function RadioScreen({ navigation }) {
             styles.playIndicator,
             isActive && styles.playIndicatorActive,
           ]}>
-            <Text style={[
-              styles.playIcon,
-              isActive && { color: Colors.emerald },
-            ]}>
-              {playing ? '⏸' : '▶'}
-            </Text>
+            {playing ? (
+              <PauseIcon size={14} color={isActive ? Colors.emerald : 'rgba(255,255,255,0.7)'} />
+            ) : (
+              <PlayIcon size={14} color={isActive ? Colors.emerald : 'rgba(255,255,255,0.7)'} />
+            )}
           </View>
         </LinearGradient>
       </TouchableOpacity>

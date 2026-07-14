@@ -240,3 +240,87 @@ export function MixerIcon({ size = 24, color = '#f5f5f0' }) {
     </Svg>
   );
 }
+
+// ============================================================
+// USER — Anonymous / Profile
+// ============================================================
+export function UserIcon({ size = 24, color = '#f5f5f0' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Circle
+        cx="12"
+        cy="7"
+        r="4"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+// ============================================================
+// TRASH — Delete/Clear
+// ============================================================
+export function TrashIcon({ size = 24, color = '#f5f5f0' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+// ============================================================
+// PLUS — Add/New
+// ============================================================
+export function PlusIcon({ size = 24, color = '#f5f5f0' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 5v14M5 12h14"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+// ============================================================
+// RAIN — Ambient Sound
+// ============================================================
+export function RainIcon({ size = 24, color = '#f5f5f0' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M8 20l-2-2m4 2l-2-2m4 2l-2-2m4 2l-2-2"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <Path
+        d="M6.04 14.5a5.5 5.5 0 011.08-10.85 7.5 7.5 0 0113.82 2.7 4 4 0 01-1.34 7.65"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+

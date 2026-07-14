@@ -20,6 +20,7 @@ import { HeadphonesIcon, MoonIcon } from '../components/IconsExtra';
 import { IslamicStar } from '../components/IslamicPattern';
 import ScreenContainer from '../components/ScreenContainer';
 import Header, { HeaderIconButton } from '../components/Header';
+import { usePremium } from '../contexts/PremiumContext';
 import {
   playRecitation,
   playSurahFromServerWithVerseTracking,
@@ -93,6 +94,7 @@ function FloatingParticle({ delay, x, color }) {
 }
 
 export default function PremiumPlayerScreen({ navigation, route }) {
+  const { isPremium } = usePremium();
   const { surah: initialSurah, verse, reciter: initialReciter } = route.params || {};
   const [surah, setSurah] = useState(initialSurah);
   const [currentReciter, setCurrentReciter] = useState(initialReciter || null);
@@ -368,7 +370,19 @@ export default function PremiumPlayerScreen({ navigation, route }) {
         <IslamicStar size={200} color={Colors.emeraldBorder} opacity={0.02} />
       </View>
 
-      <Header title="Şimdi Çalıyor" onBack={() => navigation.goBack()} onRightAction={() => navigation.navigate('SleepMode')} rightIcon={<MoonIcon size={18} color={Colors.textMuted} />} />
+      <Header 
+        title="Şimdi Çalıyor" 
+        onBack={() => navigation.goBack()} 
+        onRightAction={() => {
+          if (isPremium) navigation.navigate('SleepMode');
+          else navigation.navigate('Paywall');
+        }} 
+        rightIcon={
+          <View>
+            <MoonIcon size={18} color={Colors.textMuted} />
+          </View>
+        } 
+      />
 
       {/* Main content */}
       <Animated.View
@@ -471,16 +485,30 @@ export default function PremiumPlayerScreen({ navigation, route }) {
 
       {/* Bottom bar */}
       <View style={styles.bottomBar}>
-        <TouchableOpacity style={styles.bottomAction} activeOpacity={0.7}>
-          <Text style={styles.bottomActionText}>⏱ Uyku Zamanlayıcı</Text>
+        <TouchableOpacity 
+          style={styles.bottomAction} 
+          activeOpacity={0.7}
+          onPress={() => {
+            if (isPremium) navigation.navigate('SleepMode');
+            else navigation.navigate('Paywall');
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text style={styles.bottomActionText}>⏱ Uyku Zamanlayıcı</Text>
+          </View>
         </TouchableOpacity>
         <View style={styles.bottomDot} />
         <TouchableOpacity
           style={styles.bottomAction}
           activeOpacity={0.7}
-          onPress={() => navigation.navigate('AmbientMixer')}
+          onPress={() => {
+            if (isPremium) navigation.navigate('AmbientMixer');
+            else navigation.navigate('Paywall');
+          }}
         >
-          <Text style={styles.bottomActionText}>🎵 Ambient Sesler</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text style={styles.bottomActionText}>🎵 Ambient Sesler</Text>
+          </View>
         </TouchableOpacity>
       </View>
     </ScreenContainer>

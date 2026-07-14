@@ -51,6 +51,13 @@ import SleepModeScreen from './src/screens/SleepModeScreen';
 import RadioScreen from './src/screens/RadioScreen';
 import PrayerTimesScreen from './src/screens/PrayerTimesScreen';
 import CityPickerScreen from './src/screens/CityPickerScreen';
+import PaywallScreen from './src/screens/PaywallScreen';
+import LibraryRecitersScreen from './src/screens/LibraryRecitersScreen';
+import SimplePlayerScreen from './src/screens/SimplePlayerScreen';
+import SurahListScreen from './src/screens/SurahListScreen';
+import ZikirmatikScreen from './src/screens/ZikirmatikScreen';
+import QiblaScreen from './src/screens/QiblaScreen';
+import { PremiumProvider } from './src/contexts/PremiumContext';
 
 const Stack = createNativeStackNavigator();
 
@@ -200,6 +207,39 @@ function AppStack({ initialRouteName }) {
         component={CityPickerScreen}
         options={{ animation: 'slide_from_bottom' }}
       />
+
+      <Stack.Screen
+        name="Paywall"
+        component={PaywallScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="LibraryReciters"
+        component={LibraryRecitersScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
+
+      <Stack.Screen
+        name="SimplePlayer"
+        component={SimplePlayerScreen}
+        options={{ animation: 'fade_from_bottom' }}
+      />
+
+      <Stack.Screen
+        name="SurahList"
+        component={SurahListScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
+      <Stack.Screen
+        name="Zikirmatik"
+        component={ZikirmatikScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="Qibla"
+        component={QiblaScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
     </Stack.Navigator>
   );
 }
@@ -252,7 +292,9 @@ function App() {
             translucent={false}
           />
           <NavigationContainer theme={HuzurTheme}>
-            <AppStack initialRouteName={initialRoute} />
+            <PremiumProvider>
+              <AppStack initialRouteName={initialRoute} />
+            </PremiumProvider>
           </NavigationContainer>
         </ToastProvider>
       </SafeAreaProvider>
