@@ -82,7 +82,7 @@ ${question}
   }
 
   //-------------------------------------------------
-  // GENERAL MODE
+  // GENERAL MODE (Diyanet Search Mode)
   //-------------------------------------------------
 
   else {
@@ -90,20 +90,18 @@ ${question}
     prompt = `
 You are Huzur AI.
 
-The knowledge base does not contain enough information.
+The local knowledge base does not contain enough information.
 
-Answer using your own knowledge.
+Instead of your general knowledge, you MUST search the internet, specifically targeting the official website of the Turkish Presidency of Religious Affairs (Diyanet).
 
-Do NOT fabricate Qur'an verses.
-
-Do NOT fabricate Hadith.
-
-If you are unsure about a narration,
-say that you are unsure.
+1. Search for the user's question on Diyanet's official websites (e.g., kurul.diyanet.gov.tr, fetva.diyanet.gov.tr, diyanet.gov.tr).
+2. Write the answer based ONLY on the fatwas and information you find from Diyanet.
+3. If you find a fatwa or information from Diyanet, clearly cite it (e.g., "Diyanet İşleri Başkanlığı'nın açıklamasına göre...").
+4. Do NOT answer based on your own general knowledge. If Diyanet has no information about it, say "Türkiye Diyanet İşleri Başkanlığı'nın kaynaklarında bu konuya dair güncel bir fetva veya bilgi bulunamadı."
 
 At the beginning write exactly:
 
-⚠️ Bu cevap doğrulanmış bilgi tabanından değil, yapay zekanın genel bilgisinden üretilmiştir.
+🔍 Bu cevap veritabanında bulunamadığı için Diyanet İşleri Başkanlığı (diyanet.gov.tr) kaynaklarından canlı olarak araştırılmıştır.
 
 QUESTION:
 
@@ -118,8 +116,11 @@ ${question}
   for (let i = 0; i < retries; i++) {
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-flash-latest",
+        model: "gemini-2.5-flash",
         contents: prompt,
+        config: mode === "general" ? {
+          tools: [{ googleSearch: {} }],
+        } : undefined,
       });
 
       return typeof response.text === "function"

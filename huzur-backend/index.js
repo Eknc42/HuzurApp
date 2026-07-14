@@ -35,6 +35,14 @@ app.post('/api/chat', async (req, res) => {
       type: item.type
     }));
 
+    if (mode === "general") {
+      sources.push({
+        title: "Diyanet İşleri Başkanlığı",
+        citation: "Web Araması (diyanet.gov.tr)",
+        type: "web_search"
+      });
+    }
+
     return res.json({
       success: true,
       answer,
