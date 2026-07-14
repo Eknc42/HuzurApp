@@ -118,9 +118,8 @@ ${question}
       const response = await ai.models.generateContent({
         model: "gemini-flash-latest",
         contents: prompt,
-        config: mode === "general" ? {
-          tools: [{ googleSearch: {} }],
-        } : undefined,
+        // Google Search Tool requires a paid/billing-enabled project, which causes 429 quota errors here.
+        // The prompt alone is sufficient to ground the model on Diyanet rulings.
       });
 
       return typeof response.text === "function"

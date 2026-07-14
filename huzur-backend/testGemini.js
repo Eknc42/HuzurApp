@@ -11,8 +11,9 @@ Zekâtı verin.
 `;
 
     const answer = await askGemini(
-        "Namaz neden önemlidir?",
-        context
+        "Kripto para caiz mi?",
+        "",
+        "general"
     );
 
     console.log(answer);
