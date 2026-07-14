@@ -114,11 +114,12 @@ ${question}
 
   let retries = 3;
   let lastError;
+  let currentModel = "gemini-flash-latest";
   
   for (let i = 0; i < retries; i++) {
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-flash-latest",
+        model: currentModel,
         contents: prompt,
         // Google Search Tool requires a paid/billing-enabled project, which causes 429 quota errors here.
         // The prompt alone is sufficient to ground the model on Diyanet rulings.
@@ -132,6 +133,11 @@ ${question}
       if (error.status === 503) {
         console.warn(`Gemini 503 Error. Retrying in ${i + 1} seconds...`);
         await new Promise(r => setTimeout(r, (i + 1) * 1000));
+        continue;
+      }
+      if (error.status === 429 && currentModel === "gemini-flash-latest") {
+        console.warn(`Gemini 429 Quota Error on flash. Falling back to pro...`);
+        currentModel = "gemini-1.5-pro-latest"; // Try pro model instead
         continue;
       }
       throw error;
