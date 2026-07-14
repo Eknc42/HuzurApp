@@ -54,7 +54,7 @@ KRİTİK KURALLAR:
    - Cevabı SADECE Türkiye Diyanet İşleri Başkanlığı'nın (Diyanet) fetvalarına ve bilgilerine dayanarak ver.
    - Diyanet'i açıkça kaynak göster (örneğin, "Diyanet İşleri Başkanlığı'nın açıklamasına göre...").
    - Kendi genel bilgisini KULLANMA.
-   - Cevabının en başına tam olarak şunu yaz: "🔍 Veritabanındaki eşleşmeler sorunuzla alakalı olmadığı için bu cevap Diyanet İşleri Başkanlığı (diyanet.gov.tr) kaynaklarından derlenmiştir."
+   - Cevabının en başına tam olarak şu gizli etiketi yaz: "[DIYANET_MODU]" (Bunun dışında veritabanında bulunamadığına dair hiçbir şey söyleme, sadece cevabı ver).
 3. Eğer bağlam KISMEN alakalıysa ve cevabı tamamlamak için Diyanet bilgilerine de ihtiyacın varsa:
    - Önce sağlanan bağlama göre cevabı yaz.
    - Ardından, yeşil bir ayırıcı çizgi eklemek için yeni bir satıra tam olarak [SEPARATOR] kelimesini ekle (başında ve sonunda boşluk olacak şekilde).
@@ -92,8 +92,10 @@ Kendi genel bilgin yerine, internette SADECE Türkiye Diyanet İşleri Başkanl�
 
 Lütfen yanıtını akıcı, düzgün ve tamamen Türkçe dilinde ver. Yabancı kelimeler veya harfler kullanma.
 
-Cevabının en başına tam olarak şunu yaz:
-🔍 Bu cevap veritabanında bulunamadığı için Diyanet İşleri Başkanlığı (diyanet.gov.tr) kaynaklarından canlı olarak araştırılmıştır.
+Cevabının en başına tam olarak şu gizli etiketi yaz:
+[DIYANET_MODU]
+
+Bunun dışında veritabanında bulunamadığına dair hiçbir şey söyleme, sadece cevabı ver.
 
 SORU:
 ${question}
