@@ -54,7 +54,7 @@ app.post('/api/chat', async (req, res) => {
     
     let errorMessage = 'Sunucu tarafında bir hata oluştu.';
     if (error.status === 429) {
-      errorMessage = 'API Sınırı: ' + (error.message || 'Limit doldu.');
+      errorMessage = 'Arka arkaya çok fazla soru sorduğunuz için sistem geçici olarak yavaşlatıldı. Lütfen 15 saniye bekleyip tekrar deneyin.';
     } else if (error.status === 503) {
       errorMessage = 'Yapay zeka servisi şu an çok yoğun. Lütfen biraz bekleyip tekrar deneyin.';
     } else if (error.message) {
