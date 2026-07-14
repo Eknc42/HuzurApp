@@ -33,7 +33,7 @@ app.post('/api/chat', async (req, res) => {
       context = "";
     }
 
-    const answer = await askGemini(question, context, mode);
+    let answer = await askGemini(question, context, mode);
 
     let sources = results.map(item => ({
       title: item.title,
