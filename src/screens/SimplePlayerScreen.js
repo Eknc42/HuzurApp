@@ -363,13 +363,22 @@ export default function SimplePlayerScreen({ navigation, route }) {
         onBack={() => navigation.goBack()} 
         rightActions={
           <TouchableOpacity
-            style={{ padding: 8 }}
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: 'rgba(16,185,129,0.1)',
+              borderWidth: 1,
+              borderColor: 'rgba(16,185,129,0.3)',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
             onPress={() => {
               if (isPremium) navigation.navigate('SleepMode');
               else navigation.navigate('Paywall');
             }}
           >
-            <MoonIcon size={24} color={Colors.textMuted} />
+            <MoonIcon size={22} color={Colors.emerald} />
           </TouchableOpacity>
         }
       />
