@@ -160,8 +160,7 @@ export default function PaywallScreen({ navigation }) {
                 end={{ x: 0, y: 1 }}
               />
               <View style={styles.featuresList}>
-                <FeatureItem text="Sınırsız AI Asistan erişimi" />
-                <FeatureItem text="27.000 veri ile eğitilmiş %100 güvenilir kaynaklar" highlight />
+                <FeatureItem text="27.000 veri ile eğitilmiş %100 güvenilir AI Asistan'a sınırsız erişim" highlight />
                 <FeatureItem text="Kişiselleştirilmiş günlük tavsiyeler" />
                 <FeatureItem text="Özel Uyku Modu ve ekran koruyucu" />
                 <FeatureItem text="Sakinleştirici doğa ve ambiyans sesleri" />
