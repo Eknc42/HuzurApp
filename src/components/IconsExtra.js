@@ -341,3 +341,20 @@ export function ShuffleIcon({ size = 24, color = '#f5f5f0' }) {
     </Svg>
   );
 }
+
+// ============================================================
+// LIGHTBULB — Idea, Explanation, Guide
+// ============================================================
+export function LightbulbIcon({ size = 24, color = '#f5f5f0' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M9 18h6M10 21h4M15 8.5a3 3 0 11-6 0c0-2.5 2-4.5 3-4.5s3 2 3 4.5zM9 15c0-1.5-2-3-2-5.5a5 5 0 0110 0c0 2.5-2 4-2 5.5v3H9v-3z"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
