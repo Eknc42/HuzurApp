@@ -145,7 +145,7 @@ function AppStack({ initialRouteName }) {
       <Stack.Screen
         name="AIChat"
         component={AIChatScreen}
-        options={{ animation: 'slide_from_right' }}
+        options={({ route }) => ({ animation: route.params?.animation || 'slide_from_right' })}
       />
 
       <Stack.Screen
