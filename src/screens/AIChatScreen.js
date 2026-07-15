@@ -95,15 +95,8 @@ export default function AIChatScreen({ navigation }) {
       if (storedSessions) {
         const parsed = JSON.parse(storedSessions);
         setSessions(parsed);
-        // Load the most recent session by default if exists
-        if (parsed.length > 0) {
-          await loadChat(parsed[0].id);
-        } else {
-          setIsInitialLoadDone(true);
-        }
-      } else {
-        setIsInitialLoadDone(true);
       }
+      setIsInitialLoadDone(true);
     } catch (e) {
       console.warn('Oturumlar yüklenemedi:', e);
       setIsInitialLoadDone(true);
