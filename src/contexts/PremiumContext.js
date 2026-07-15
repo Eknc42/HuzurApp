@@ -8,7 +8,7 @@ const PremiumContext = createContext({
 });
 
 export const PremiumProvider = ({ children }) => {
-  const [isPremium, setIsPremium] = useState(true);
+  const [isPremium, setIsPremium] = useState(false);
 
   useEffect(() => {
     // Initialize RevenueCat when context mounts
@@ -20,7 +20,7 @@ export const PremiumProvider = ({ children }) => {
     Purchases.addCustomerInfoUpdateListener((info) => {
       // const hasPremium = info.entitlements.active['Premium'] !== undefined;
       // setIsPremium(hasPremium);
-      setIsPremium(true); // GECICI OLARAK PREMIUM AKTIF (TEST ICIN)
+      setIsPremium(false); // GECICI OLARAK PREMIUM KAPALI (TEST ICIN PAYWALL GORUNSUN)
     });
 
   }, []);
@@ -28,7 +28,7 @@ export const PremiumProvider = ({ children }) => {
   const checkPremium = async () => {
     // const status = await checkPremiumStatus();
     // setIsPremium(status);
-    setIsPremium(true); // GECICI OLARAK PREMIUM AKTIF (TEST ICIN)
+    setIsPremium(false); // GECICI OLARAK PREMIUM KAPALI (TEST ICIN PAYWALL GORUNSUN)
   };
 
   return (
