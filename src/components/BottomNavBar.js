@@ -13,6 +13,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Radius, Shadows, Spacing } from '../theme/colors';
+import { usePremium } from '../contexts/PremiumContext';
 import {
   CrescentIcon, SparkleIcon, BookmarkIcon,
 } from './Icons';
@@ -95,6 +96,7 @@ function NavItem({ item, isActive, onPress }) {
 export default function BottomNavBar({ activeTab = 'Home' }) {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { isPremium } = usePremium();
   const resolvedTab = normalizeActiveTab(activeTab);
   const currentIndex = NAV_ITEMS.findIndex(item => item.key === resolvedTab);
 
@@ -124,7 +126,11 @@ export default function BottomNavBar({ activeTab = 'Home' }) {
     } else if (item.key === 'AI') {
       navigation.navigate('MoodSelection', { animation });
     } else if (item.key === 'AIChat') {
-      navigation.navigate('AIChat', { animation });
+      if (!isPremium) {
+        navigation.navigate('Paywall');
+      } else {
+        navigation.navigate('AIChat', { animation });
+      }
     } else if (item.key === 'Radio') {
       navigation.navigate('Radio', { animation });
     } else {
