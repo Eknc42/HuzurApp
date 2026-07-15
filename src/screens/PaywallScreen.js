@@ -179,6 +179,8 @@ export default function PaywallScreen({ navigation }) {
               ) : (
                 packages.map((pkg, index) => {
                   const isPopular = index === 0 || packages.length === 1; // Mark first as popular
+                  const cleanTitle = pkg.product.title.split(' (')[0];
+
                   return (
                     <TouchableOpacity
                       key={pkg.identifier}
@@ -189,25 +191,33 @@ export default function PaywallScreen({ navigation }) {
                     >
                       {isPopular && (
                         <LinearGradient
-                          colors={['rgba(16, 185, 129, 0.15)', 'rgba(16, 185, 129, 0)']}
+                          colors={['rgba(16, 185, 129, 0.1)', 'rgba(16, 185, 129, 0)']}
                           style={StyleSheet.absoluteFillObject}
                           start={{ x: 0, y: 0 }}
-                          end={{ x: 0, y: 1 }}
+                          end={{ x: 1, y: 1 }}
                         />
                       )}
                       
                       {isPopular && (
                         <View style={styles.popularBadge}>
+                          <SparkleIcon size={10} color="#ffffff" />
                           <Text style={styles.popularBadgeText}>EN POPÜLER</Text>
                         </View>
                       )}
 
-                      <View style={styles.packageInfo}>
-                        <Text style={styles.packageTitle}>{pkg.product.title}</Text>
-                        <Text style={styles.packageDesc}>{pkg.product.description}</Text>
-                      </View>
-                      <View style={styles.priceWrap}>
-                        <Text style={styles.packagePrice}>{pkg.product.priceString}</Text>
+                      <View style={styles.packageCardContent}>
+                        <View style={styles.packageHeaderRow}>
+                          <View style={styles.packageInfo}>
+                            <Text style={styles.packageTitle}>{cleanTitle}</Text>
+                            <Text style={styles.packageDesc}>{pkg.product.description}</Text>
+                          </View>
+                          
+                          <View style={[styles.priceBadge, isPopular && styles.priceBadgePopular]}>
+                            <Text style={[styles.packagePrice, isPopular && styles.packagePricePopular]}>
+                              {pkg.product.priceString}
+                            </Text>
+                          </View>
+                        </View>
                       </View>
                     </TouchableOpacity>
                   );
@@ -371,14 +381,12 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
   },
   packageCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: 'rgba(255,255,255,0.03)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
     borderRadius: Radius.xl,
-    padding: Spacing.lg,
+    padding: Spacing.xl,
+    paddingTop: Spacing.xxl,
     overflow: 'hidden',
   },
   packageCardPopular: {
@@ -387,15 +395,27 @@ const styles = StyleSheet.create({
     ...Shadows.md,
     shadowColor: Colors.emerald,
   },
+  packageCardContent: {
+    flexDirection: 'column',
+  },
+  packageHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
   popularBadge: {
     position: 'absolute',
     top: 0,
-    right: 24,
+    left: 24,
     backgroundColor: Colors.emerald,
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderBottomLeftRadius: 8,
     borderBottomRightRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   popularBadgeText: {
     color: '#ffffff',
@@ -405,25 +425,41 @@ const styles = StyleSheet.create({
   },
   packageInfo: {
     flex: 1,
-    paddingRight: Spacing.md,
   },
   packageTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    marginBottom: 4,
-  },
-  packageDesc: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    lineHeight: 18,
-  },
-  priceWrap: {
-    alignItems: 'flex-end',
-  },
-  packagePrice: {
     fontSize: 20,
     fontWeight: '800',
+    color: Colors.textPrimary,
+    marginBottom: 6,
+    letterSpacing: 0.5,
+  },
+  packageDesc: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    lineHeight: 20,
+  },
+  priceBadge: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 100,
+  },
+  priceBadgePopular: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+  },
+  packagePrice: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    letterSpacing: -0.5,
+  },
+  packagePricePopular: {
     color: Colors.emeraldBright,
   },
   noPackages: {
