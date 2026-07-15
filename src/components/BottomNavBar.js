@@ -14,14 +14,14 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Radius, Shadows, Spacing } from '../theme/colors';
 import {
-  CrescentIcon, SparkleIcon, BookmarkIcon,
+  CrescentIcon, SparkleIcon, BookmarkIcon, CompassIcon,
 } from './Icons';
 import { BookOpenIcon, RadioTowerIcon } from './IconsExtra';
 
 const NAV_ITEMS = [
   { key: 'Home', label: 'Ana', route: 'Home' },
   { key: 'AI', label: 'Rehber', route: 'AIExplanation' },
-  { key: 'Favorites', label: 'Kayıt', route: 'Favorites' },
+  { key: 'AIChat', label: 'Asistan', route: 'AIChat' },
   { key: 'Radio', label: 'Radyo', route: 'Radio' },
   { key: 'Quran', label: "Kur'an", route: 'Quran' },
 ];
@@ -56,8 +56,8 @@ function NavItem({ item, isActive, onPress }) {
   const renderIcon = () => {
     switch (item.key) {
       case 'Home': return <CrescentIcon size={size} color={color} />;
-      case 'AI': return <SparkleIcon size={size} color={color} />;
-      case 'Favorites': return <BookmarkIcon size={size} color={color} />;
+      case 'AI': return <CompassIcon size={size} color={color} />;
+      case 'AIChat': return <SparkleIcon size={size} color={color} />;
       case 'Radio': return <RadioTowerIcon size={size} color={color} />;
       case 'Quran': return <BookOpenIcon size={size} color={color} />;
       default: return null;
@@ -123,6 +123,8 @@ export default function BottomNavBar({ activeTab = 'Home' }) {
       navigation.reset({ index: 0, routes: [{ name: 'Home', params: { animation } }] });
     } else if (item.key === 'AI') {
       navigation.navigate('MoodSelection', { animation });
+    } else if (item.key === 'AIChat') {
+      navigation.navigate('AIChat', { animation });
     } else if (item.key === 'Radio') {
       navigation.navigate('Radio', { animation });
     } else {

@@ -39,7 +39,7 @@ const QUICK_ACTIONS = [
   { id: 'zikirmatik', label: 'Zikirmatik', subtitle: 'Zikirlerini say', color: '#f43f5e', screen: 'Zikirmatik', Icon: HeartIcon },
   { id: 'prayer', label: 'Namaz Vakitleri', subtitle: 'Canlı sayaç', color: '#c4b5fd', screen: 'PrayerTimes', Icon: ClockIcon },
   { id: 'qibla', label: 'Kıble', subtitle: 'Kabe yönü', color: '#f59e0b', screen: 'Qibla', Icon: CompassIcon },
-  { id: 'guide', label: 'Rehber', subtitle: 'Ayet açıklamaları', color: '#a78bfa', screen: 'AIExplanation', Icon: CompassIcon },
+  { id: 'favorites', label: 'Kayıt', subtitle: 'Kayıtlı ayetler', color: '#a78bfa', screen: 'Favorites', Icon: BookmarkIcon },
   { id: 'quran', label: 'Kur\'an-ı Kerim', subtitle: '114 sure', color: '#10b981', screen: 'Quran', Icon: BookOpenIcon },
 ];
 
