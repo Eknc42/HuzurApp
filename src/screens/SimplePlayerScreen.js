@@ -361,15 +361,17 @@ export default function SimplePlayerScreen({ navigation, route }) {
       <Header 
         title="Kapsamlı Dinleme" 
         onBack={() => navigation.goBack()} 
-        onRightAction={() => {
-          if (isPremium) navigation.navigate('SleepMode');
-          else navigation.navigate('Paywall');
-        }} 
-        rightIcon={
-          <View>
-            <MoonIcon size={18} color={Colors.textMuted} />
-          </View>
-        } 
+        rightActions={
+          <TouchableOpacity
+            style={{ padding: 8 }}
+            onPress={() => {
+              if (isPremium) navigation.navigate('SleepMode');
+              else navigation.navigate('Paywall');
+            }}
+          >
+            <MoonIcon size={24} color={Colors.textMuted} />
+          </TouchableOpacity>
+        }
       />
 
       {/* Main content */}
@@ -490,19 +492,8 @@ export default function SimplePlayerScreen({ navigation, route }) {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.bottomBar}>
-        <TouchableOpacity 
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 8 }}
-          onPress={() => {
-            if (isPremium) navigation.navigate('SleepMode');
-            else navigation.navigate('Paywall');
-          }}
-          activeOpacity={0.7}
-        >
-          <MoonIcon size={18} color={Colors.textMuted} />
-          <Text style={styles.bottomActionText}>Uyku Modu</Text>
-        </TouchableOpacity>
-      </View>
+      <View style={{ height: 40 }} />
+
       {/* Surah Selection Modal */}
       <Modal
         visible={isSurahModalVisible}
