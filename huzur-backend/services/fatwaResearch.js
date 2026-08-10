@@ -62,6 +62,60 @@ async function mapLimited(items, limit, worker) {
   return results;
 }
 
+function prioritizeRelevantPassage(pageText, searchSnippet) {
+  const snippet = String(searchSnippet || '').trim();
+  if (!snippet) return pageText;
+  const needle = snippet.slice(0, 80).toLocaleLowerCase('tr-TR');
+  const index = pageText.toLocaleLowerCase('tr-TR').indexOf(needle);
+  if (index < 0) return pageText;
+  const start = Math.max(0, index - 800);
+  const relevantPassage = pageText.slice(start, index + 5200);
+  return `${relevantPassage}\n\nSAYFA BAŞLANGICI:\n${pageText.slice(0, 1000)}`;
+}
+
+async function openVerifiedCandidates(candidates, focusedQuestion) {
+  return mapLimited(candidates, 4, async candidate => {
+    try {
+      // Search results are never fetched unless the URL is already on the allowlist.
+      if (!classifySource(candidate.url)) return null;
+      const page = await openPage(candidate.url);
+      const verification = verifySource(page, focusedQuestion);
+      if (!verification.valid) return null;
+      return {
+        name: verification.classification.name,
+        title: page.title || candidate.title,
+        url: page.url,
+        type: verification.classification.type,
+        level: verification.classification.level,
+        label: candidate.madhhab ? MADHHAB_LABELS[candidate.madhhab] : verification.classification.label,
+        madhhab: candidate.madhhab,
+        // The excerpt is taken from the opened page itself. Search snippets are
+        // used only to locate the relevant passage, never as answer evidence.
+        content: prioritizeRelevantPassage(page.text, candidate.snippet),
+      };
+    } catch (error) {
+      console.warn(`Page skipped (${candidate.url}):`, error.message);
+      return null;
+    }
+  });
+}
+
+async function researchTrustedEducationalSources(focusedQuestion) {
+  try {
+    const query = `site:islamansiklopedisi.org.tr OR site:diyanet.gov.tr ${focusedQuestion}`;
+    const results = await webSearch(query, { count: 5 });
+    const candidates = results.slice(0, 4).map(result => ({
+      ...result,
+      searchLabel: 'Güvenilir İslami bilgi kaynağı',
+      madhhab: null,
+    }));
+    return (await openVerifiedCandidates(candidates, focusedQuestion)).filter(Boolean);
+  } catch (error) {
+    console.warn('Trusted educational source search skipped:', error.message);
+    return [];
+  }
+}
+
 async function researchFatwa(question, analysis) {
   const internationalQuestion = internationalSearchPhrase(question, analysis);
   const plan = buildSearchPlan(internationalQuestion, analysis);
@@ -87,30 +141,18 @@ async function researchFatwa(question, analysis) {
     }
   }));
 
-  const opened = await mapLimited(candidates, 4, async candidate => {
-    try {
-      // Search results are never fetched unless the URL is already on the allowlist.
-      if (!classifySource(candidate.url)) return null;
-      const page = await openPage(candidate.url);
-      const verification = verifySource(page, focusedQuestion);
-      if (!verification.valid) return null;
-      return {
-        name: verification.classification.name,
-        title: page.title || candidate.title,
-        url: page.url,
-        type: verification.classification.type,
-        level: verification.classification.level,
-        label: candidate.madhhab ? MADHHAB_LABELS[candidate.madhhab] : verification.classification.label,
-        madhhab: candidate.madhhab,
-        content: page.text,
-      };
-    } catch (error) {
-      console.warn(`Page skipped (${candidate.url}):`, error.message);
-      return null;
-    }
-  });
+  const opened = await openVerifiedCandidates(candidates, focusedQuestion);
+  let verifiedSources = opened.filter(Boolean);
 
-  return opened.filter(Boolean)
+  // Basic educational questions often live in encyclopedic/religious guidance
+  // pages rather than fatwa databases. Sensitive legal/financial topics retain
+  // the stricter fatwa-only failure behavior.
+  const sensitiveTopic = ['boşanma', 'finans', 'aile'].includes(analysis.topic);
+  if (verifiedSources.length === 0 && !analysis.comparison && !analysis.madhhab && !sensitiveTopic) {
+    verifiedSources = await researchTrustedEducationalSources(focusedQuestion);
+  }
+
+  return verifiedSources
     .sort((a, b) => {
       const requestedMadhhab = analysis.madhhab && analysis.madhhab !== 'all'
         ? analysis.madhhab
@@ -122,4 +164,10 @@ async function researchFatwa(question, analysis) {
     .slice(0, analysis.comparison ? 10 : 7);
 }
 
-module.exports = { buildSearchPlan, focusedSearchPhrase, internationalSearchPhrase, researchFatwa };
+module.exports = {
+  buildSearchPlan,
+  focusedSearchPhrase,
+  internationalSearchPhrase,
+  researchTrustedEducationalSources,
+  researchFatwa,
+};

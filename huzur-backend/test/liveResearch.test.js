@@ -39,6 +39,8 @@ test('dört mezhep sorusu tüm mezheplere ayrı arama üretir', () => {
 test('yalnız izin verilen kaynak alan adlarını sınıflandırır', () => {
   assert.equal(classifySource('https://fetva.diyanet.gov.tr/x').level, 5);
   assert.equal(classifySource('https://iifa-aifi.org/en/123').type, 'official_fatwa');
+  assert.equal(classifySource('https://islamansiklopedisi.org.tr/namaz').type, 'academic_reference');
+  assert.equal(classifySource('https://istanbul.diyanet.gov.tr/bilgi').type, 'official_islamic_info');
   assert.equal(classifySource('https://example.com/fetva'), null);
 });
 

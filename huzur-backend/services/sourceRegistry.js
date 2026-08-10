@@ -1,8 +1,15 @@
 const SOURCE_RULES = [
   {
-    domains: ['fetva.diyanet.gov.tr', 'kurul.diyanet.gov.tr', 'diyanet.gov.tr'],
+    domains: ['fetva.diyanet.gov.tr', 'kurul.diyanet.gov.tr'],
     name: 'Diyanet Din İşleri Yüksek Kurulu',
     type: 'official_fatwa',
+    level: 5,
+    label: 'Diyanet',
+  },
+  {
+    domains: ['diyanet.gov.tr'],
+    name: 'Diyanet İşleri Başkanlığı',
+    type: 'official_islamic_info',
     level: 5,
     label: 'Diyanet',
   },
@@ -26,6 +33,13 @@ const SOURCE_RULES = [
     type: 'institutional',
     level: 4,
     label: 'Mezhep kaynağı',
+  },
+  {
+    domains: ['islamansiklopedisi.org.tr'],
+    name: 'TDV İslâm Ansiklopedisi',
+    type: 'academic_reference',
+    level: 4,
+    label: 'TDV İslâm Ansiklopedisi',
   },
   {
     domains: ['islamqa.org'],
