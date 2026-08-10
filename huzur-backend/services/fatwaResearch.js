@@ -79,7 +79,10 @@ async function openVerifiedCandidates(candidates, focusedQuestion) {
       // Search results are never fetched unless the URL is already on the allowlist.
       if (!classifySource(candidate.url)) return null;
       const page = await openPage(candidate.url);
-      const verification = verifySource(page, focusedQuestion);
+      const verification = verifySource({
+        ...page,
+        title: `${candidate.title || page.title} ${candidate.snippet || ''}`.trim(),
+      }, focusedQuestion);
       if (!verification.valid) return null;
       return {
         name: verification.classification.name,
