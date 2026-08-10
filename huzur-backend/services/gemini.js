@@ -1,7 +1,9 @@
 require('dotenv').config({ path: ['.env.local', '.env'] });
 const Groq = require('groq-sdk');
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+// Model fallback is handled explicitly below; SDK retries would otherwise make
+// a rate-limited request wait tens of seconds before trying the fallback model.
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY, maxRetries: 0 });
 const MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 const FALLBACK_MODEL = process.env.GROQ_FALLBACK_MODEL || 'llama-3.1-8b-instant';
 const VALIDATOR_MODEL = process.env.GROQ_VALIDATOR_MODEL || FALLBACK_MODEL;
