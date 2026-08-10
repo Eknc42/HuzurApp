@@ -31,9 +31,25 @@ const SMOKING_DIYANET_REFERENCE = {
   coverage: 'direct_ruling',
   content: 'Sigaranın mübah görülmesi düşünülemez. Bazı alimler sigaranın tahrimen, harama yakın mekruh olduğunu söylemiştir. Günümüzde birçok alim ve fetva meclisi zarar ve sağlığı koruma ilkeleri nedeniyle sigaranın haram olduğu görüşündedir. Dolayısıyla bir Müslümanın sigara içmesi caiz değildir.',
 };
+const PRAYER_INVALIDATORS_DIYANET_REFERENCE = {
+  name: 'Diyanet İşleri Başkanlığı',
+  title: 'Namaz İlmihali — Namazı Bozan Şeyler',
+  url: 'https://namaz.diyanet.gov.tr/namaz/html/kutuphane/HTML/NamazIlmihali/assets/common/downloads/publication.pdf',
+  type: 'official_islamic_info',
+  level: 5,
+  label: 'Diyanet',
+  madhhab: null,
+  coverage: 'prayer_invalidators',
+  content: 'Namazın rükünlerinden veya şartlarından birinin eksikliği namazı bozar. Namazı bozan başlıca şeyler: namazda bilerek, yanılarak veya yanlışlıkla konuşmak; namaz dışı çok hareket etmek; yönü kıbleden çevirmek; yiyip içmek; özürsüz boğaz temizlemeye veya öksürmeye çalışmak; üf, tüh, uf, puf, ah, oh gibi sözler söylemek; normal sebeple inlemek; gülmek; avret yeri açık veya namaza engel necaset varken bir rükün eda etmek.',
+};
 
 function isSmokingQuestion(value) {
   return /\b(sigara|tütün|tobacco|smoking|cigarette)/i.test(String(value || ''));
+}
+
+function isPrayerInvalidatorQuestion(value) {
+  const text = String(value || '').toLocaleLowerCase('tr-TR');
+  return /namaz/.test(text) && /(bozan|bozar|bozul|konuş)/.test(text);
 }
 
 function focusedSearchPhrase(question) {
@@ -49,6 +65,9 @@ function focusedSearchPhrase(question) {
 function internationalSearchPhrase(question, analysis) {
   const text = String(question).toLocaleLowerCase('tr-TR');
   if (/sefer|yolcu/.test(text) && analysis.topic === 'namaz') return 'traveler prayer shortening rules';
+  if (analysis.topic === 'namaz' && /(bozan|bozar|bozul|konuş)/.test(text)) {
+    return 'what invalidates prayer salah speaking eating movement';
+  }
   if (analysis.topic === 'abdest') return 'what invalidates wudu ablution';
   if (/müzik/.test(text)) return 'music permissible Islamic ruling';
   if (/sigara|tütün/.test(text)) return 'smoking tobacco Islamic ruling';
@@ -91,6 +110,14 @@ function curatedCandidates(analysis, verificationQuestion) {
     return [{
       ...SMOKING_DIYANET_REFERENCE,
       snippet: 'Sigara içmenin dini hükmü nedir? Sigara içmesi caiz değildir.',
+      searchLabel: 'Diyanet',
+      verificationQuestion: analysis.subtopic,
+    }];
+  }
+  if (isPrayerInvalidatorQuestion(analysis.subtopic)) {
+    return [{
+      ...PRAYER_INVALIDATORS_DIYANET_REFERENCE,
+      snippet: 'Namazı bozan şeyler: namazda konuşmak, çok hareket etmek, kıbleden dönmek, yiyip içmek.',
       searchLabel: 'Diyanet',
       verificationQuestion: analysis.subtopic,
     }];
@@ -239,6 +266,12 @@ async function researchFatwa(question, analysis) {
     verifiedSources.unshift({ ...SMOKING_DIYANET_REFERENCE });
   }
   if (
+    isPrayerInvalidatorQuestion(question)
+    && !verifiedSources.some(source => source.coverage === 'prayer_invalidators')
+  ) {
+    verifiedSources.unshift({ ...PRAYER_INVALIDATORS_DIYANET_REFERENCE });
+  }
+  if (
     analysis.topic === 'abdest'
     && analysis.madhhab === 'shafii'
     && !verifiedSources.some(source => source.coverage === 'complete_list')
@@ -298,6 +331,7 @@ module.exports = {
   internationalSearchPhrase,
   SHAFII_ABLUTION_REFERENCE,
   SMOKING_DIYANET_REFERENCE,
+  PRAYER_INVALIDATORS_DIYANET_REFERENCE,
   researchTrustedEducationalSources,
   researchFatwa,
 };

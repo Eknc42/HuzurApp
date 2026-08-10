@@ -163,6 +163,31 @@ JSON şeması:
 }
 
 function createDeterministicSourceAnswer(analysis, sources) {
+  const prayerInvalidatorsSourceIndex = sources.findIndex(source => (
+    source.coverage === 'prayer_invalidators'
+    && source.label === 'Diyanet'
+    && /namazda.*konuşmak/i.test(source.content)
+  ));
+  if (/namaz/i.test(analysis.subtopic || '') && prayerInvalidatorsSourceIndex >= 0) {
+    const sourceId = prayerInvalidatorsSourceIndex + 1;
+    const asksAboutSpeaking = /konuş/i.test(analysis.subtopic || '');
+    const shortAnswer = asksAboutSpeaking
+      ? 'Evet. Diyanet Namaz İlmihali’ne göre namazda konuşmak namazı bozar.'
+      : 'Namazın şart veya rükünlerinden birinin eksilmesi; konuşmak, çok hareket etmek, kıbleden dönmek, yiyip içmek ve benzeri namaza aykırı davranışlar namazı bozar.';
+    const answer = asksAboutSpeaking
+      ? 'Diyanet Namaz İlmihali’ne göre namazda bilerek, yanılarak veya yanlışlıkla konuşmak namazı bozar. Birine seslenmek, selâm vermek ya da verilen selâma sözle karşılık vermek ve aksırana “çok yaşa” demek de konuşma kapsamında değerlendirilir.'
+      : 'Diyanet Namaz İlmihali’nde başlıca namaz bozucular şöyle sıralanır:\n\n1. Namazın bir şartının veya rüknünün eksilmesi.\n2. Namazda konuşmak.\n3. Dışarıdan bakıldığında namazda olunmadığı izlenimi verecek kadar çok ve namaz dışı hareket etmek.\n4. Göğsü kıble yönünden çevirmek.\n5. Yiyip içmek.\n6. Özür olmadan boğaz temizlemeye veya öksürmeye çalışmak.\n7. “Üf, tüh, uf, puf, ah, oh” gibi sözler söylemek veya normal sebeple inlemek.\n8. Kişinin kendisinin duyacağı kadar gülmek.\n9. Avret yeri açıkken ya da namaza engel miktarda necaset varken bir rükün eda etmek.';
+    return {
+      short_answer: shortAnswer,
+      answer,
+      has_multiple_views: false,
+      topic: analysis.topic,
+      source_ids: [sourceId],
+      views: [{ label: 'Diyanet', answer, source_ids: [sourceId] }],
+      general_knowledge: false,
+    };
+  }
+
   const smokingSourceIndex = sources.findIndex(source => (
     source.coverage === 'direct_ruling'
     && source.label === 'Diyanet'

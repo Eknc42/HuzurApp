@@ -7,6 +7,7 @@ const {
   internationalSearchPhrase,
   SHAFII_ABLUTION_REFERENCE,
   SMOKING_DIYANET_REFERENCE,
+  PRAYER_INVALIDATORS_DIYANET_REFERENCE,
 } = require('../services/fatwaResearch');
 const { classifySource } = require('../services/sourceRegistry');
 const { verifySource } = require('../services/webSearch');
@@ -34,6 +35,10 @@ test('uluslararası arama için İngilizce konu sorgusu üretir', () => {
   assert.equal(
     internationalSearchPhrase('Sigara içmek caiz mi?', analyzeQuestion('Sigara içmek caiz mi?')),
     'smoking tobacco Islamic ruling',
+  );
+  assert.equal(
+    internationalSearchPhrase('Namazda konuşmak namazı bozar mı?', analyzeQuestion('Namazda konuşmak namazı bozar mı?')),
+    'what invalidates prayer salah speaking eating movement',
   );
 });
 
@@ -84,6 +89,32 @@ test('sigara hükmünü model çağrısı olmadan Diyanet nüansıyla aktarır',
   assert.match(result.answer, /tahrîmen.*mekruh/i);
   assert.match(result.answer, /haram olduğu görüşündedir/i);
   assert.deepEqual(result.source_ids, [1]);
+});
+
+test('namaz bozucuları için doğrulanmış Diyanet İlmihali özeti hazırdır', () => {
+  assert.match(PRAYER_INVALIDATORS_DIYANET_REFERENCE.content, /namazda.*konuşmak/i);
+  assert.match(PRAYER_INVALIDATORS_DIYANET_REFERENCE.url, /namaz\.diyanet\.gov\.tr.*publication\.pdf$/);
+  assert.equal(PRAYER_INVALIDATORS_DIYANET_REFERENCE.coverage, 'prayer_invalidators');
+});
+
+test('namazda konuşma sorusunu model çağrısı olmadan cevaplar', () => {
+  const result = createDeterministicSourceAnswer(
+    analyzeQuestion('Namazda konuşmak namazı bozar mı?'),
+    [PRAYER_INVALIDATORS_DIYANET_REFERENCE],
+  );
+  assert.match(result.short_answer, /^Evet/i);
+  assert.match(result.answer, /bilerek, yanılarak veya yanlışlıkla konuşmak namazı bozar/i);
+  assert.deepEqual(result.source_ids, [1]);
+});
+
+test('namazı bozan durumları Diyanet listesinden aktarır', () => {
+  const result = createDeterministicSourceAnswer(
+    analyzeQuestion('Namazı bozan durumlar nelerdir?'),
+    [PRAYER_INVALIDATORS_DIYANET_REFERENCE],
+  );
+  assert.match(result.answer, /Namazda konuşmak/i);
+  assert.match(result.answer, /Göğsü kıble yönünden çevirmek/i);
+  assert.match(result.answer, /Yiyip içmek/i);
 });
 
 test('Şafii abdest tam listesini model çağrısı olmadan güvenli biçimde aktarır', () => {
