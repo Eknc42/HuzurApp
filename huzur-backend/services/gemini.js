@@ -1,132 +1,132 @@
-require("dotenv").config();
-const Groq = require("groq-sdk");
+require('dotenv').config({ path: ['.env.local', '.env'] });
+const Groq = require('groq-sdk');
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+const NO_SOURCE_MESSAGE = 'Bu konuda güvenilir ve doğrulanabilir bir fetva kaynağı bulamadım. Bu nedenle kesin bir hüküm vermek istemiyorum.';
 
-async function askGemini(question, context, mode = "rag") {
+const SYSTEM_PROMPT = `Sen Huzur uygulamasının kaynak tabanlı İslami bilgi asistanısın.
+Görevin fetva üretmek değil, açılmış ve doğrulanmış web kaynaklarındaki görüşleri Türkçe aktarmaktır.
+Yalnızca VERİLEN KAYNAK İÇERİKLERİNİ kullan. Genel eğitim bilgini kullanma.
+Bir kaynağın söylemediği hiçbir şeyi ona atfetme; kaynak, alim, kitap, hadis, ayet veya URL uydurma.
+Farklı kurum ve mezheplerin görüşlerini birbirine karıştırma. Fark varsa kesin tek hüküm verme.
+Her önemli dini/fıkhi iddia source_ids alanındaki en az bir kaynak kimliğiyle desteklenmelidir.
+Kaynak içeriğinde açıkça mezhep adı yoksa o kaynağı bütün mezhebe atfetme.
+Özellikle tıp, boşanma, nikah, miras, finans ve kişisel meselelerde yetersiz kaynakla kesin hüküm verme.
+JSON dışında hiçbir şey yazma.`;
 
-  let prompt = "";
-
-  //-------------------------------------------------
-  // RAG MODE
-  //-------------------------------------------------
-
-  if (mode === "rag") {
-
-    prompt = `
-Sen Huzur AI'sın (İslami Yapay Zeka Asistanı).
-
-SADECE aşağıda verilen bağlamı (context) kullanarak cevap ver.
-
-Asla kendi genel bilgini kullanma. Asla Kur'an ayeti uydurma. Asla Hadis uydurma.
-
-Eğer sorunun cevabı aşağıdaki bağlamda (context) yoksa, SADECE şu cümleyi söyle:
-"Bu konuda bilgi tabanımda yeterli bilgi bulunamadı."
-
-Cevap verirken daima yararlandığın kaynakları belirt. Lütfen yanıtını akıcı, düzgün ve tamamen Türkçe dilinde ver. Yabancı kelimeler veya harfler kullanma.
-
-BAĞLAM (CONTEXT):
-${context}
-
-SORU:
-${question}
-`;
-
+function parseJson(text) {
+  try {
+    return JSON.parse(text);
+  } catch (_) {
+    const match = String(text).match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('Model geçerli JSON döndürmedi.');
+    return JSON.parse(match[0]);
   }
-
-  //-------------------------------------------------
-  // MIXED MODE
-  //-------------------------------------------------
-
-  else if (mode === "mixed") {
-
-    prompt = `
-Sen Huzur AI'sın (İslami Yapay Zeka Asistanı).
-
-Sana yerel bilgi tabanından (veritabanından) bazı kaynaklar (bağlam/context) sağlandı.
-İlk olarak, kullanıcının sorusunu SADECE bu bağlamı kullanarak cevaplamaya çalış.
-
-KRİTİK KURALLAR:
-1. Eğer verilen bağlam kullanıcının sorusunun cevabını İÇERMİYORSA, bağlamı tamamen GÖRMEZDEN GEL. Bağlamın neyle ilgili olduğundan bahsetme ve kaynakları listeleme.
-2. Eğer bağlam tamamen alakasızsa, tıpkı Diyanet Modunda olduğun gibi davranmalısın:
-   - Cevabı SADECE Türkiye Diyanet İşleri Başkanlığı'nın (Diyanet) fetvalarına ve bilgilerine dayanarak ver.
-   - Diyanet'i açıkça kaynak göster (örneğin, "Diyanet İşleri Başkanlığı'nın açıklamasına göre...").
-   - Kendi genel bilgisini KULLANMA.
-   - Cevabının en başına tam olarak şu gizli etiketi yaz: "[DIYANET_MODU]" (Bunun dışında veritabanında bulunamadığına dair hiçbir şey söyleme, sadece cevabı ver).
-3. Eğer bağlam KISMEN alakalıysa ve cevabı tamamlamak için Diyanet bilgilerine de ihtiyacın varsa:
-   - Önce sağlanan bağlama göre cevabı yaz.
-   - Ardından, yeşil bir ayırıcı çizgi eklemek için yeni bir satıra tam olarak [SEPARATOR] kelimesini ekle (başında ve sonunda boşluk olacak şekilde).
-   - [SEPARATOR] kelimesinin altına, ek Diyanet fetvasını/bilgisini yaz.
-4. Eğer bağlam TAM cevabı içeriyorsa, soruyu sadece bağlamı kullanarak cevapla ve kaynakları açıkça belirt. [SEPARATOR] kullanma.
-
-Asla Kur'an ayeti uydurma. Asla Hadis uydurma.
-Lütfen yanıtını akıcı, düzgün ve tamamen Türkçe dilinde ver. Yabancı kelimeler (İngilizce vb.) veya Çince karakterler kesinlikle kullanma.
-
-BAĞLAM (CONTEXT):
-${context}
-
-SORU:
-${question}
-`;
-
-  }
-
-  //-------------------------------------------------
-  // GENERAL MODE (Diyanet Search Mode)
-  //-------------------------------------------------
-
-  else {
-
-    prompt = `
-Sen Huzur AI'sın (İslami Yapay Zeka Asistanı).
-
-Yerel bilgi tabanı yeterli bilgi içermiyor.
-Kendi genel bilgin yerine, internette SADECE Türkiye Diyanet İşleri Başkanlığı'nın resmi web sitelerini hedef alarak arama yapmış gibi davranmalısın.
-
-1. Kullanıcının sorusunu Diyanet'in resmi web sitelerine (kurul.diyanet.gov.tr, fetva.diyanet.gov.tr, diyanet.gov.tr vb.) dayandır.
-2. Cevabı SADECE Diyanet'ten bulduğun fetvalara ve bilgilere dayanarak yaz.
-3. Diyanet'i açıkça kaynak göster (örneğin, "Diyanet İşleri Başkanlığı'nın açıklamasına göre...").
-4. Kendi genel bilgine dayanarak cevap verme. Eğer Diyanet'in bu konuda hiçbir bilgisi yoksa, "Türkiye Diyanet İşleri Başkanlığı'nın kaynaklarında bu konuya dair güncel bir fetva veya bilgi bulunamadı." de.
-
-Lütfen yanıtını akıcı, düzgün ve tamamen Türkçe dilinde ver. Yabancı kelimeler veya harfler kullanma.
-
-Cevabının en başına tam olarak şu gizli etiketi yaz:
-[DIYANET_MODU]
-
-Bunun dışında veritabanında bulunamadığına dair hiçbir şey söyleme, sadece cevabı ver.
-
-SORU:
-${question}
-`;
-
-  }
-
-  let retries = 3;
-  let lastError;
-  
-  for (let i = 0; i < retries; i++) {
-    try {
-      const response = await groq.chat.completions.create({
-        messages: [{ role: "user", content: prompt }],
-        model: "llama-3.3-70b-versatile",
-      });
-
-      return response.choices[0]?.message?.content || "";
-    } catch (error) {
-      lastError = error;
-      if (error.status === 503 || error.status === 429) {
-        console.warn(`Groq Error. Retrying in ${i + 1} seconds...`);
-        await new Promise(r => setTimeout(r, (i + 1) * 1000));
-        continue;
-      }
-      throw error;
-    }
-  }
-  throw lastError;
 }
 
-module.exports = {
-  askGemini, // Kept the same exported name to avoid changing index.js
-};
+async function completeJson(messages, temperature = 0.1) {
+  const response = await groq.chat.completions.create({
+    messages,
+    model: MODEL,
+    temperature,
+    response_format: { type: 'json_object' },
+  });
+  return parseJson(response.choices[0]?.message?.content || '{}');
+}
+
+function sourceContext(sources) {
+  return sources.map((source, index) => `
+[KAYNAK ${index + 1}]
+Kurum: ${source.name}
+Etiket: ${source.label}
+Tür/seviye: ${source.type}/${source.level}
+Mezhep: ${source.madhhab || 'belirtilmedi'}
+Başlık: ${source.title}
+URL: ${source.url}
+İçerik: ${source.content.slice(0, 6500)}
+[/KAYNAK ${index + 1}]`).join('\n');
+}
+
+function sanitizeIds(ids, max) {
+  return [...new Set((Array.isArray(ids) ? ids : [])
+    .map(Number).filter(id => Number.isInteger(id) && id >= 1 && id <= max))];
+}
+
+function normalizeDraft(draft, sources, analysis) {
+  const views = (Array.isArray(draft.views) ? draft.views : []).flatMap(view => {
+    const sourceIds = sanitizeIds(view.source_ids, sources.length);
+    if (!view?.answer || sourceIds.length === 0) return [];
+    return [{ label: String(view.label || 'Kaynak görüşü'), answer: String(view.answer), source_ids: sourceIds }];
+  });
+  const usedIds = sanitizeIds(
+    [...sanitizeIds(draft.source_ids, sources.length), ...views.flatMap(view => view.source_ids)],
+    sources.length,
+  );
+  return {
+    short_answer: String(draft.short_answer || NO_SOURCE_MESSAGE),
+    answer: String(draft.answer || draft.short_answer || NO_SOURCE_MESSAGE),
+    has_multiple_views: views.length > 1,
+    topic: analysis.topic,
+    source_ids: usedIds,
+    views,
+  };
+}
+
+async function validateDraft(question, draft, sources, analysis) {
+  const validationPrompt = `Aşağıdaki taslak yanıtı kaynak içerikleriyle iddia iddia denetle.
+Desteklenmeyen, yanlış kaynağa atfedilen veya mezhepleri karıştıran her ifadeyi çıkar ya da düzelt.
+Sadece kaynak kimliklerini kullan. Aynı JSON şemasını eksiksiz döndür.
+
+SORU: ${question}
+ANALİZ: ${JSON.stringify(analysis)}
+TASLAK: ${JSON.stringify(draft)}
+KAYNAKLAR: ${sourceContext(sources)}
+
+JSON şeması:
+{"short_answer":"...","answer":"...","source_ids":[1],"views":[{"label":"...","answer":"...","source_ids":[1]}]}`;
+  return completeJson([
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'user', content: validationPrompt },
+  ], 0);
+}
+
+async function createGroundedAnswer(question, analysis, sources) {
+  if (!sources.length) {
+    return {
+      short_answer: NO_SOURCE_MESSAGE,
+      answer: NO_SOURCE_MESSAGE,
+      has_multiple_views: false,
+      topic: analysis.topic,
+      source_ids: [],
+      views: [],
+    };
+  }
+
+  const prompt = `Kullanıcının sorusunu yalnız aşağıdaki açılmış sayfaların içeriğine göre yanıtla.
+Kısa cevap temkinli ve doğrudan olsun. answer alanı açıklamayı içersin.
+Her kurum/mezhep görüşünü ayrı views öğesine yaz; birleştirme.
+URL yazma; kullandığın [KAYNAK N] numaralarını source_ids olarak ver.
+Kaynaklar yeterli değilse kesin hüküm verme ve eksikliği açıkça söyle.
+
+SORU: ${question}
+SORU ANALİZİ: ${JSON.stringify(analysis)}
+KAYNAKLAR: ${sourceContext(sources)}
+
+Yalnız şu JSON şemasını döndür:
+{"short_answer":"...","answer":"...","source_ids":[1],"views":[{"label":"Diyanet","answer":"...","source_ids":[1]}]}`;
+
+  const draft = normalizeDraft(await completeJson([
+    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'user', content: prompt },
+  ]), sources, analysis);
+  const validated = await validateDraft(question, draft, sources, analysis);
+  return normalizeDraft(validated, sources, analysis);
+}
+
+// Eski içe aktarmaları açık bir hata ile korur; bu yol artık /api/chat tarafından kullanılmaz.
+async function askGemini() {
+  throw new Error('Legacy RAG answer generation is disabled. Use createGroundedAnswer.');
+}
+
+module.exports = { createGroundedAnswer, askGemini, NO_SOURCE_MESSAGE };

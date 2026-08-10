@@ -1,84 +1,89 @@
 const express = require('express');
 const cors = require('cors');
-const { hybridSearch } = require('./hybridSearch');
-const { askGemini } = require('./services/gemini');
+const { analyzeQuestion } = require('./services/questionAnalyzer');
+const { researchFatwa } = require('./services/fatwaResearch');
+const { createGroundedAnswer } = require('./services/gemini');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '32kb' }));
 
-app.post('/api/chat', async (req, res) => {
-  const { question } = req.body;
-  if (!question) {
-    return res.status(400).json({ success: false, error: 'Question is required' });
+function publicSource(source) {
+  return {
+    name: source.name,
+    title: source.title,
+    url: source.url,
+    type: source.type,
+    level: source.level,
+    madhhab: source.madhhab,
+  };
+}
+
+function hydrateAnswer(generated, researchedSources, analysis) {
+  const getSources = ids => ids.map(id => researchedSources[id - 1]).filter(Boolean).map(publicSource);
+  const usedSources = getSources(generated.source_ids);
+  const views = generated.views.map(view => ({
+    label: view.label,
+    answer: view.answer,
+    sources: getSources(view.source_ids),
+  }));
+
+  if (analysis.comparison) {
+    const requestedLabels = ['Hanefi', 'Şafii', 'Maliki', 'Hanbeli', 'Diyanet', 'IIFA', 'Dar al-Ifta'];
+    requestedLabels.forEach(label => {
+      if (!views.some(view => view.label.toLocaleLowerCase('tr-TR').includes(label.toLocaleLowerCase('tr-TR')))) {
+        views.push({
+          label,
+          answer: `Bu konuda güvenilir ve doğrulanabilir bir ${label} kaynağı bulunamadı.`,
+          sources: [],
+        });
+      }
+    });
   }
+
+  return {
+    success: true,
+    answer: generated.answer,
+    short_answer: generated.short_answer,
+    has_multiple_views: generated.has_multiple_views || views.length > 1,
+    topic: generated.topic,
+    analysis,
+    sources: usedSources,
+    views,
+    searched_live: true,
+    can_compare: !analysis.comparison && usedSources.length > 0,
+  };
+}
+
+async function handleChat(req, res) {
+  const question = typeof req.body?.question === 'string' ? req.body.question.trim() : '';
+  if (!question) return res.status(400).json({ success: false, error: 'Soru gereklidir.' });
+  if (question.length > 500) return res.status(400).json({ success: false, error: 'Soru 500 karakterden kısa olmalıdır.' });
 
   try {
-    const { results, bestScore } = await hybridSearch(question);
-    
-    let mode = results.length > 0 ? "mixed" : "general";
-    let context = "";
-
-    // Eğer en iyi skor çok düşükse, alakasız sonuçlar gelmiş demektir
-    if (bestScore < 0.05) {
-      mode = "general";
-      context = "";
-    }
-
-    results.forEach((item) => {
-      context += `Kaynak:\n${item.citation || item.title}\n\n${item.content}\n\n----------------------------------------\n`;
-    });
-
-    if (mode === "general") {
-      context = "";
-    }
-
-    let answer = await askGemini(question, context, mode);
-
-    let sources = results.map(item => ({
-      title: item.title,
-      citation: item.citation || item.title,
-      type: item.type
-    }));
-
-    if (mode === "general" || answer.includes("[DIYANET_MODU]")) {
-      sources = [{
-        title: "Diyanet İşleri Başkanlığı",
-        citation: "Fetva ve Kaynaklar (diyanet.gov.tr)",
-        type: "web_search"
-      }];
-      answer = answer.replace("[DIYANET_MODU]", "").trim();
-    } else if (answer.includes("[SEPARATOR]")) {
-      sources.push({
-        title: "Diyanet İşleri Başkanlığı",
-        citation: "Ek Bilgi (diyanet.gov.tr)",
-        type: "web_search"
-      });
-    }
-
-    return res.json({
-      success: true,
-      answer,
-      bestScore,
-      sources
-    });
+    const analysis = analyzeQuestion(question, Boolean(req.body?.compare));
+    const researchedSources = await researchFatwa(question, analysis);
+    const generated = await createGroundedAnswer(question, analysis, researchedSources);
+    return res.json(hydrateAnswer(generated, researchedSources, analysis));
   } catch (error) {
-    console.error('API Error:', error);
-    
-    let errorMessage = 'Sunucu tarafında bir hata oluştu.';
-    if (error.status === 429) {
-      errorMessage = 'Arka arkaya çok fazla soru sorduğunuz için sistem geçici olarak yavaşlatıldı. Lütfen 1 dakika bekleyip tekrar deneyin. (Hata Kaynağı: ' + (error.name || error.status) + ')';
-    } else if (error.status === 503) {
-      errorMessage = 'Yapay zeka servisi şu an çok yoğun. Lütfen biraz bekleyip tekrar deneyin.';
-    } else if (error.message) {
-      errorMessage = error.message;
-    }
-
-    return res.status(200).json({ success: false, error: errorMessage });
+    console.error('Live fatwa research error:', error);
+    const rateLimited = error.status === 429;
+    return res.status(rateLimited ? 429 : 503).json({
+      success: false,
+      error: rateLimited
+        ? 'Araştırma servisi geçici olarak yoğun. Lütfen biraz sonra tekrar deneyin.'
+        : 'Güvenilir kaynak araştırması şu anda tamamlanamadı. Kesin bir yanıt vermek istemiyorum.',
+    });
   }
-});
+}
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Backend is running on port ${PORT}`);
-});
+app.post('/api/chat', handleChat);
+app.post('/api/chat/compare', (req, res) => handleChat({ ...req, body: { ...req.body, compare: true } }, res));
+app.get('/health', (_req, res) => res.json({ ok: true, mode: 'live-web-research' }));
+
+if (require.main === module) {
+  const port = process.env.PORT || 3000;
+  app.listen(port, () => console.log(`Backend is running on port ${port}`));
+}
+
+module.exports = { app, handleChat, hydrateAnswer };
