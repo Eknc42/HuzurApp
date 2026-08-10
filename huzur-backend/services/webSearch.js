@@ -205,6 +205,8 @@ function tokenAppears(haystack, token) {
     oruç: ['fasting', 'fast'],
     macunu: ['toothpaste'],
     müzik: ['music'],
+    sigara: ['smoking', 'tobacco', 'cigarette'],
+    tütün: ['smoking', 'tobacco', 'cigarette'],
     namaz: ['prayer', 'salah'],
     seferi: ['traveller', 'traveler', 'travel'],
     abdest: ['ablution', 'wudu'],

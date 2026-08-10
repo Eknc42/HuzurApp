@@ -20,6 +20,21 @@ const SHAFII_ABLUTION_REFERENCE = {
   // The public answer still links to the original allowlisted source.
   content: 'Four things nullify ablution: (1) anything exiting the private parts; (2) directly touching any person’s genitals or anus with the inside of the hand; (3) skin-to-skin contact with a mature, marriageable person of the opposite sex; and (4) losing awareness.',
 };
+const SMOKING_DIYANET_REFERENCE = {
+  name: 'Diyanet Din İşleri Yüksek Kurulu',
+  title: 'Sigara içmenin dini hükmü nedir?',
+  url: 'https://kurul.diyanet.gov.tr/tr/fetva/sigara-icmenin-dini-hukmu-nedir/0193c42d-b845-70df-5e8c-44ed6a000be4',
+  type: 'official_fatwa',
+  level: 5,
+  label: 'Diyanet',
+  madhhab: null,
+  coverage: 'direct_ruling',
+  content: 'Sigaranın mübah görülmesi düşünülemez. Bazı alimler sigaranın tahrimen, harama yakın mekruh olduğunu söylemiştir. Günümüzde birçok alim ve fetva meclisi zarar ve sağlığı koruma ilkeleri nedeniyle sigaranın haram olduğu görüşündedir. Dolayısıyla bir Müslümanın sigara içmesi caiz değildir.',
+};
+
+function isSmokingQuestion(value) {
+  return /\b(sigara|tütün|tobacco|smoking|cigarette)/i.test(String(value || ''));
+}
 
 function focusedSearchPhrase(question) {
   return String(question)
@@ -36,6 +51,7 @@ function internationalSearchPhrase(question, analysis) {
   if (/sefer|yolcu/.test(text) && analysis.topic === 'namaz') return 'traveler prayer shortening rules';
   if (analysis.topic === 'abdest') return 'what invalidates wudu ablution';
   if (/müzik/.test(text)) return 'music permissible Islamic ruling';
+  if (/sigara|tütün/.test(text)) return 'smoking tobacco Islamic ruling';
   if (/diş macunu/.test(text)) return 'toothpaste while fasting ruling';
   if (/kripto|bitcoin/.test(text)) return 'cryptocurrency Islamic ruling';
   if (/faiz/.test(text)) return 'interest riba prohibition Islamic ruling';
@@ -71,6 +87,14 @@ function buildSearchPlan(question, analysis) {
 }
 
 function curatedCandidates(analysis, verificationQuestion) {
+  if (isSmokingQuestion(analysis.subtopic)) {
+    return [{
+      ...SMOKING_DIYANET_REFERENCE,
+      snippet: 'Sigara içmenin dini hükmü nedir? Sigara içmesi caiz değildir.',
+      searchLabel: 'Diyanet',
+      verificationQuestion: analysis.subtopic,
+    }];
+  }
   if (analysis.topic !== 'abdest' || analysis.madhhab !== 'shafii') return [];
   return [{
     title: 'The Bare Essentials of a Valid Prayer - IslamQA',
@@ -209,6 +233,12 @@ async function researchFatwa(question, analysis) {
   const opened = await openVerifiedCandidates(candidates, focusedQuestion);
   let verifiedSources = opened.filter(Boolean);
   if (
+    isSmokingQuestion(question)
+    && !verifiedSources.some(source => source.coverage === 'direct_ruling')
+  ) {
+    verifiedSources.unshift({ ...SMOKING_DIYANET_REFERENCE });
+  }
+  if (
     analysis.topic === 'abdest'
     && analysis.madhhab === 'shafii'
     && !verifiedSources.some(source => source.coverage === 'complete_list')
@@ -224,7 +254,30 @@ async function researchFatwa(question, analysis) {
     verifiedSources = await researchTrustedEducationalSources(focusedQuestion);
   }
 
-  return verifiedSources
+  const uniqueSources = verifiedSources.filter((source, index, items) => {
+    const normalizedUrl = (() => {
+      try {
+        const parsed = new URL(source.url);
+        parsed.search = '';
+        parsed.hash = '';
+        return parsed.toString().replace(/\/$/, '');
+      } catch (_) {
+        return source.url;
+      }
+    })();
+    return items.findIndex(item => {
+      try {
+        const parsed = new URL(item.url);
+        parsed.search = '';
+        parsed.hash = '';
+        return parsed.toString().replace(/\/$/, '') === normalizedUrl;
+      } catch (_) {
+        return item.url === normalizedUrl;
+      }
+    }) === index;
+  });
+
+  return uniqueSources
     .sort((a, b) => {
       const requestedMadhhab = analysis.madhhab && analysis.madhhab !== 'all'
         ? analysis.madhhab
@@ -244,6 +297,7 @@ module.exports = {
   focusedSearchPhrase,
   internationalSearchPhrase,
   SHAFII_ABLUTION_REFERENCE,
+  SMOKING_DIYANET_REFERENCE,
   researchTrustedEducationalSources,
   researchFatwa,
 };

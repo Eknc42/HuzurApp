@@ -6,6 +6,7 @@ const {
   curatedCandidates,
   internationalSearchPhrase,
   SHAFII_ABLUTION_REFERENCE,
+  SMOKING_DIYANET_REFERENCE,
 } = require('../services/fatwaResearch');
 const { classifySource } = require('../services/sourceRegistry');
 const { verifySource } = require('../services/webSearch');
@@ -30,6 +31,10 @@ test('uluslararası arama için İngilizce konu sorgusu üretir', () => {
   const question = 'Şafii mezhebine göre abdest nasıl bozulur?';
   const analysis = analyzeQuestion(question);
   assert.equal(internationalSearchPhrase(question, analysis), 'what invalidates wudu ablution');
+  assert.equal(
+    internationalSearchPhrase('Sigara içmek caiz mi?', analyzeQuestion('Sigara içmek caiz mi?')),
+    'smoking tobacco Islamic ruling',
+  );
 });
 
 test('dört mezhep sorusu tüm mezheplere ayrı arama üretir', () => {
@@ -62,6 +67,23 @@ test('hosting kaynağı açamazsa doğrulanmış Şafii referans özeti hazırd�
   assert.match(SHAFII_ABLUTION_REFERENCE.content, /four things nullify ablution/i);
   assert.match(SHAFII_ABLUTION_REFERENCE.url, /^https:\/\/islamqa\.org\/shafii/);
   assert.equal(SHAFII_ABLUTION_REFERENCE.coverage, 'complete_list');
+});
+
+test('sigara sorusu için doğrulanmış Diyanet hükmü hazırdır', () => {
+  assert.match(SMOKING_DIYANET_REFERENCE.content, /sigara içmesi caiz değildir/i);
+  assert.match(SMOKING_DIYANET_REFERENCE.url, /^https:\/\/kurul\.diyanet\.gov\.tr/);
+  assert.equal(SMOKING_DIYANET_REFERENCE.coverage, 'direct_ruling');
+});
+
+test('sigara hükmünü model çağrısı olmadan Diyanet nüansıyla aktarır', () => {
+  const result = createDeterministicSourceAnswer(
+    analyzeQuestion('Sigara haram mı?'),
+    [SMOKING_DIYANET_REFERENCE],
+  );
+  assert.match(result.short_answer, /caiz değildir/i);
+  assert.match(result.answer, /tahrîmen.*mekruh/i);
+  assert.match(result.answer, /haram olduğu görüşündedir/i);
+  assert.deepEqual(result.source_ids, [1]);
 });
 
 test('Şafii abdest tam listesini model çağrısı olmadan güvenli biçimde aktarır', () => {

@@ -163,6 +163,26 @@ JSON şeması:
 }
 
 function createDeterministicSourceAnswer(analysis, sources) {
+  const smokingSourceIndex = sources.findIndex(source => (
+    source.coverage === 'direct_ruling'
+    && source.label === 'Diyanet'
+    && (/sigara içmenin dini hükmü/i.test(source.title) || /sigara içmesi caiz değildir/i.test(source.content))
+  ));
+  if (/sigara|tütün/i.test(analysis.subtopic || '') && smokingSourceIndex >= 0) {
+    const sourceId = smokingSourceIndex + 1;
+    const shortAnswer = 'Diyanet Din İşleri Yüksek Kuruluna göre sigara içmek caiz değildir.';
+    const answer = 'Diyanet, sigaranın sağlığa verdiği bilimsel olarak ortaya konmuş ciddi zararlar nedeniyle mübah görülemeyeceğini belirtir. Bazı âlimler sigarayı “tahrîmen (harama yakın) mekruh” saymıştır. Günümüzde birçok âlim ve fetva meclisi ise kişinin kendisine ve başkalarına zarar vermemesi, zararın giderilmesi ve sağlığın korunması ilkelerinden hareketle sigaranın haram olduğu görüşündedir. Sonuç olarak Diyanet’e göre sigara içmek caiz değildir.';
+    return {
+      short_answer: shortAnswer,
+      answer,
+      has_multiple_views: false,
+      topic: analysis.topic,
+      source_ids: [sourceId],
+      views: [{ label: 'Diyanet', answer, source_ids: [sourceId] }],
+      general_knowledge: false,
+    };
+  }
+
   const completeListIndex = sources.findIndex(source => (
     source.coverage === 'complete_list'
     && source.madhhab === 'shafii'
