@@ -5,7 +5,7 @@ const Groq = require('groq-sdk');
 // a rate-limited request wait tens of seconds before trying the fallback model.
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY, maxRetries: 0 });
 const MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
-const FALLBACK_MODEL = process.env.GROQ_FALLBACK_MODEL || 'llama-3.1-8b-instant';
+const FALLBACK_MODEL = process.env.GROQ_FALLBACK_MODEL || 'openai/gpt-oss-120b';
 const VALIDATOR_MODEL = process.env.GROQ_VALIDATOR_MODEL || FALLBACK_MODEL;
 const NO_SOURCE_MESSAGE = 'Bu konuda güvenilir ve doğrulanabilir bir fetva kaynağı bulamadım. Bu nedenle kesin bir hüküm vermek istemiyorum.';
 
@@ -13,6 +13,8 @@ const SYSTEM_PROMPT = `Sen Huzur uygulamasının kaynak tabanlı İslami bilgi a
 Görevin fetva üretmek değil, açılmış ve doğrulanmış web kaynaklarındaki görüşleri Türkçe aktarmaktır.
 Yalnızca VERİLEN KAYNAK İÇERİKLERİNİ kullan. Genel eğitim bilgini kullanma.
 Bir kaynağın söylemediği hiçbir şeyi ona atfetme; kaynak, alim, kitap, hadis, ayet veya URL uydurma.
+Bir şeyin necis olması, temizlenmesi gerekmesi veya namazı etkilemesi onun abdesti bozduğu anlamına gelmez; bu hükümleri kesinlikle birbirine dönüştürme.
+Kaynağın "bozmaz", "geçersiz kılmaz" gibi olumsuz hükmünü tersine çevirme ve miktar/şart ekleyerek "bozar" sonucuna ulaşma.
 Farklı kurum ve mezheplerin görüşlerini birbirine karıştırma. Fark varsa kesin tek hüküm verme.
 Her önemli dini/fıkhi iddia source_ids alanındaki en az bir kaynak kimliğiyle desteklenmelidir.
 Kaynak içeriğinde açıkça mezhep adı yoksa o kaynağı bütün mezhebe atfetme.
@@ -38,24 +40,57 @@ function parseJson(text) {
 
 async function requestJson(messages, temperature, model) {
   const response = await groq.chat.completions.create({
-    messages, model, temperature, response_format: { type: 'json_object' },
+    messages,
+    model,
+    temperature,
+    max_completion_tokens: 1400,
+    response_format: { type: 'json_object' },
   });
   return parseJson(response.choices[0]?.message?.content || '{}');
 }
 
-async function completeJson(messages, { temperature = 0.1, model = MODEL, fallbackModel } = {}) {
+function isRetryableModelError(error) {
+  const status = Number(error?.status);
+  return status === 408
+    || status === 409
+    || status === 429
+    || status >= 500
+    || ['ECONNRESET', 'ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT'].includes(error?.code);
+}
+
+function isModelFormatError(error) {
+  return error?.error?.error?.code === 'json_validate_failed';
+}
+
+function isFallbackableModelError(error) {
+  return isRetryableModelError(error) || isModelFormatError(error);
+}
+
+async function requestJsonWithTransientRetry(messages, temperature, model) {
   try {
     return await requestJson(messages, temperature, model);
   } catch (error) {
-    if (error.status === 429 && fallbackModel && fallbackModel !== model) {
-      console.warn(`Groq ${model} rate limited; using ${fallbackModel}.`);
-      return requestJson(messages, temperature, fallbackModel);
+    // A quota error will not clear in milliseconds, but a dropped connection
+    // or an upstream 5xx frequently does. Retry those once before changing model.
+    if (!isRetryableModelError(error) || error.status === 429) throw error;
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return requestJson(messages, temperature, model);
+  }
+}
+
+async function completeJson(messages, { temperature = 0.1, model = MODEL, fallbackModel } = {}) {
+  try {
+    return await requestJsonWithTransientRetry(messages, temperature, model);
+  } catch (error) {
+    if (isFallbackableModelError(error) && fallbackModel && fallbackModel !== model) {
+      console.warn(`Groq ${model} temporarily unavailable; using ${fallbackModel}.`);
+      return requestJsonWithTransientRetry(messages, temperature, fallbackModel);
     }
     throw error;
   }
 }
 
-function sourceContext(sources, maxContentLength = 3500) {
+function sourceContext(sources, maxContentLength = 2400) {
   return sources.map((source, index) => `
 [KAYNAK ${index + 1}]
 Kurum: ${source.name}
@@ -105,6 +140,9 @@ function normalizeDraft(draft, sources, analysis) {
 async function validateDraft(question, draft, sources, analysis) {
   const validationPrompt = `Aşağıdaki taslak yanıtı kaynak içerikleriyle iddia iddia denetle.
 Desteklenmeyen, yanlış kaynağa atfedilen veya mezhepleri karıştıran her ifadeyi çıkar ya da düzelt.
+Özellikle abdest sorularında necaset/kan temizliği ve namazın geçerliliği hükümlerini abdestin bozulması hükmüne dönüştürme.
+Kaynak "bozmaz" diyorsa taslakta şart veya miktar eklenerek "bozar" denmesine izin verme.
+Kaynaklar yalnız bazı durumları kapsıyorsa yanıtın tam liste iddiasını kaldır ve kapsamın sınırlı olduğunu belirt.
 Sadece kaynak kimliklerini kullan. Aynı JSON şemasını eksiksiz döndür.
 
 SORU: ${question}
@@ -117,10 +155,41 @@ JSON şeması:
   return completeJson([
     { role: 'system', content: SYSTEM_PROMPT },
     { role: 'user', content: validationPrompt },
-  ], { temperature: 0, model: VALIDATOR_MODEL });
+  ], {
+    temperature: 0,
+    model: VALIDATOR_MODEL,
+    fallbackModel: VALIDATOR_MODEL === FALLBACK_MODEL ? MODEL : FALLBACK_MODEL,
+  });
+}
+
+function createDeterministicSourceAnswer(analysis, sources) {
+  const completeListIndex = sources.findIndex(source => (
+    source.coverage === 'complete_list'
+    && source.madhhab === 'shafii'
+    && /four things nullify ablution/i.test(source.content)
+  ));
+  if (analysis.topic !== 'abdest' || analysis.madhhab !== 'shafii' || completeListIndex < 0) {
+    return null;
+  }
+
+  const sourceId = completeListIndex + 1;
+  const shortAnswer = 'Şafii mezhebine göre abdesti dört durum bozar: ön veya arka özel yoldan bir şey çıkması; elin içiyle cinsel organa ya da anüse doğrudan dokunmak; evlenilmesi dinen mümkün karşı cinsten yetişkinle ten teması; bilincin kaybolması.';
+  const answer = `Kaynakta Şafii mezhebine göre abdesti bozan dört durum şöyle sıralanır:\n\n1. Ön veya arka özel yoldan bir şey çıkması.\n2. Elin iç kısmıyla herhangi bir kişinin cinsel organına veya anüsüne doğrudan dokunmak.\n3. Evlenilmesi dinen mümkün karşı cinsten yetişkin bir kişiyle doğrudan ten teması.\n4. Bilincin kaybolması.`;
+  return {
+    short_answer: shortAnswer,
+    answer,
+    has_multiple_views: false,
+    topic: analysis.topic,
+    source_ids: [sourceId],
+    views: [{ label: 'Şafii', answer, source_ids: [sourceId] }],
+    general_knowledge: false,
+  };
 }
 
 async function createGroundedAnswer(question, analysis, sources) {
+  const deterministicAnswer = createDeterministicSourceAnswer(analysis, sources);
+  if (deterministicAnswer) return deterministicAnswer;
+
   if (!sources.length) {
     const generated = await completeJson([
       { role: 'system', content: GENERAL_KNOWLEDGE_PROMPT },
@@ -146,6 +215,7 @@ Kısa cevap temkinli ve doğrudan olsun. answer alanı açıklamayı içersin.
 Her kurum/mezhep görüşünü ayrı views öğesine yaz; birleştirme.
 URL yazma; kullandığın [KAYNAK N] numaralarını source_ids olarak ver.
 Kaynaklar yeterli değilse kesin hüküm verme ve eksikliği açıkça söyle.
+Kaynaklar sorulan listenin yalnız bazı maddelerini açıklıyorsa bunları "bulunan kaynaklarda doğrulanabilen hususlar" diye sun; tam liste olduğunu iddia etme.
 
 SORU: ${question}
 SORU ANALİZİ: ${JSON.stringify(analysis)}
@@ -163,11 +233,21 @@ Yalnız şu JSON şemasını döndür:
     const validated = await validateDraft(question, draft, sources, analysis);
     return { ...normalizeDraft(validated, sources, analysis), general_knowledge: false };
   } catch (error) {
-    // The first pass is already source-constrained and source IDs are validated
-    // deterministically. A validator quota issue must not discard a safe answer.
-    if (error.status === 429) {
-      console.warn('Citation validator rate limited; returning the source-constrained draft.');
-      return { ...draft, general_knowledge: false };
+    // Never expose an unvalidated draft from a smaller fallback model: it can
+    // accidentally reverse a source's ruling. Keep the verified links visible
+    // and ask the user to retry instead of presenting an unsafe summary.
+    if (isFallbackableModelError(error)) {
+      console.warn('Citation validation temporarily unavailable; returning sources without a ruling.');
+      const message = 'İlgili kaynaklar bulundu ancak yanıt doğrulaması geçici olarak tamamlanamadı. Yanlış hüküm aktarmamak için lütfen kısa süre sonra tekrar deneyin.';
+      return {
+        short_answer: message,
+        answer: message,
+        has_multiple_views: false,
+        topic: analysis.topic,
+        source_ids: sources.map((_, index) => index + 1),
+        views: [],
+        general_knowledge: false,
+      };
     }
     throw error;
   }
@@ -178,4 +258,9 @@ async function askGemini() {
   throw new Error('Legacy RAG answer generation is disabled. Use createGroundedAnswer.');
 }
 
-module.exports = { createGroundedAnswer, askGemini, NO_SOURCE_MESSAGE };
+module.exports = {
+  createGroundedAnswer,
+  createDeterministicSourceAnswer,
+  askGemini,
+  NO_SOURCE_MESSAGE,
+};

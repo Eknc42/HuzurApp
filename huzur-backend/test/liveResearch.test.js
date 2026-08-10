@@ -4,6 +4,7 @@ const { analyzeQuestion } = require('../services/questionAnalyzer');
 const { buildSearchPlan, internationalSearchPhrase } = require('../services/fatwaResearch');
 const { classifySource } = require('../services/sourceRegistry');
 const { verifySource } = require('../services/webSearch');
+const { createDeterministicSourceAnswer } = require('../services/gemini');
 const { hydrateAnswer, resolveContextualQuestion } = require('../index');
 
 test('Hanefi seferilik sorusunu analiz eder', () => {
@@ -34,6 +35,27 @@ test('dört mezhep sorusu tüm mezheplere ayrı arama üretir', () => {
   ['hanafi', 'shafii', 'maliki', 'hanbali'].forEach(madhhab => {
     assert.ok(plan.some(entry => entry.madhhab === madhhab));
   });
+});
+
+test('Şafii abdest sorusunda tam liste kaynağına özel arama üretir', () => {
+  const analysis = analyzeQuestion('Şafiilere göre abdesti bozan durumlar nedir?');
+  const plan = buildSearchPlan('what invalidates wudu ablution', analysis);
+  assert.ok(plan.some(entry => entry.madhhab === 'shafii' && entry.coverage === 'complete_list'));
+});
+
+test('Şafii abdest tam listesini model çağrısı olmadan güvenli biçimde aktarır', () => {
+  const result = createDeterministicSourceAnswer(
+    { topic: 'abdest', madhhab: 'shafii' },
+    [{
+      coverage: 'complete_list',
+      madhhab: 'shafii',
+      content: 'Four things nullify ablution: (1) anything exiting the private parts; (2) touching the genitals; (3) skin contact; (4) losing awareness.',
+    }],
+  );
+
+  assert.match(result.answer, /dört durum/i);
+  assert.match(result.answer, /bilincin kaybolması/i);
+  assert.deepEqual(result.source_ids, [1]);
 });
 
 test('yalnız izin verilen kaynak alan adlarını sınıflandırır', () => {

@@ -179,8 +179,10 @@ async function openPage(url) {
     || html.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["']canonical["']/i);
   const text = stripHtml(html).slice(0, 24000);
   if (text.length < 250) throw new Error('Page has no substantial readable content');
+  const canonicalUrl = new URL(canonicalMatch?.[1] || response.url || url, response.url || url);
+  canonicalUrl.hostname = canonicalUrl.hostname.replace(/^www\.www\./, 'www.');
   const value = {
-    url: new URL(canonicalMatch?.[1] || response.url || url, response.url || url).toString(),
+    url: canonicalUrl.toString(),
     title: stripHtml(titleMatch?.[1] || ''),
     text,
   };

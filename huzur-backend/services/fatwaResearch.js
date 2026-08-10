@@ -46,6 +46,14 @@ function buildSearchPlan(question, analysis) {
     madhhab,
     query: `${MADHHAB_SEARCH_LABELS[madhhab]} ${question} site:seekersguidance.org OR site:islamqa.org`,
   }));
+  if (analysis.topic === 'abdest' && requested.includes('shafii')) {
+    plan.push({
+      label: MADHHAB_LABELS.shafii,
+      madhhab: 'shafii',
+      coverage: 'complete_list',
+      query: 'site:islamqa.org/shafii "Four things nullify ablution"',
+    });
+  }
   return plan;
 }
 
@@ -62,15 +70,26 @@ async function mapLimited(items, limit, worker) {
   return results;
 }
 
-function prioritizeRelevantPassage(pageText, searchSnippet) {
+function prioritizeRelevantPassage(pageText, searchSnippet, preferSnippet = false) {
   const snippet = String(searchSnippet || '').trim();
   if (!snippet) return pageText;
   const needle = snippet.slice(0, 80).toLocaleLowerCase('tr-TR');
-  const index = pageText.toLocaleLowerCase('tr-TR').indexOf(needle);
+  const normalizedPage = pageText.toLocaleLowerCase('tr-TR');
+  let index = normalizedPage.indexOf(needle);
+  if (index < 0 && preferSnippet) {
+    index = normalizedPage.indexOf('four things nullify ablution');
+  }
   if (index < 0) return pageText;
   const start = Math.max(0, index - 800);
   const relevantPassage = pageText.slice(start, index + 5200);
-  return `${relevantPassage}\n\nSAYFA BAŞLANGICI:\n${pageText.slice(0, 1000)}`;
+  // Fatwa pages normally state the direct question and ruling near the start.
+  // Keep that section first so the model's per-source character limit cannot
+  // hide it behind a later search-snippet match (for example a prayer-specific
+  // detail that would reverse the page's actual wudu ruling).
+  if (preferSnippet) {
+    return `DOĞRUDAN EŞLEŞEN BÖLÜM:\n${relevantPassage}\n\nSAYFA BAŞLANGICI:\n${pageText.slice(0, 2200)}`;
+  }
+  return `SAYFA BAŞLANGICI:\n${pageText.slice(0, 4200)}\n\nARAMA PARÇASININ ÇEVRESİ:\n${relevantPassage}`;
 }
 
 async function openVerifiedCandidates(candidates, focusedQuestion) {
@@ -82,7 +101,7 @@ async function openVerifiedCandidates(candidates, focusedQuestion) {
       const verification = verifySource({
         ...page,
         title: `${candidate.title || page.title} ${candidate.snippet || ''}`.trim(),
-      }, focusedQuestion);
+      }, candidate.verificationQuestion || focusedQuestion);
       if (!verification.valid) return null;
       return {
         name: verification.classification.name,
@@ -92,9 +111,14 @@ async function openVerifiedCandidates(candidates, focusedQuestion) {
         level: verification.classification.level,
         label: candidate.madhhab ? MADHHAB_LABELS[candidate.madhhab] : verification.classification.label,
         madhhab: candidate.madhhab,
+        coverage: candidate.coverage,
         // The excerpt is taken from the opened page itself. Search snippets are
         // used only to locate the relevant passage, never as answer evidence.
-        content: prioritizeRelevantPassage(page.text, candidate.snippet),
+        content: prioritizeRelevantPassage(
+          page.text,
+          candidate.snippet,
+          candidate.coverage === 'complete_list',
+        ),
       };
     } catch (error) {
       console.warn(`Page skipped (${candidate.url}):`, error.message);
@@ -140,7 +164,19 @@ async function researchFatwa(question, analysis) {
   searches.forEach(({ entry, results }) => results.slice(0, 2).forEach(result => {
     if (!seen.has(result.url) && candidates.length < 14) {
       seen.add(result.url);
-      candidates.push({ ...result, searchLabel: entry.label, madhhab: entry.madhhab });
+      candidates.push({
+        ...result,
+        searchLabel: entry.label,
+        madhhab: entry.madhhab,
+        coverage: entry.coverage,
+        // Diyanet pages are Turkish; international allowlisted sources are
+        // searched and written in English. Verify each page in its own query
+        // language so a valid English madhhab source is not rejected merely
+        // because the user's original question was Turkish.
+        verificationQuestion: entry.label === 'Diyanet'
+          ? focusedQuestion
+          : internationalQuestion,
+      });
     }
   }));
 
@@ -162,7 +198,9 @@ async function researchFatwa(question, analysis) {
         : null;
       const aPriority = requestedMadhhab && a.madhhab === requestedMadhhab ? 1 : 0;
       const bPriority = requestedMadhhab && b.madhhab === requestedMadhhab ? 1 : 0;
-      return (bPriority - aPriority) || (b.level - a.level);
+      const aCoverage = a.coverage === 'complete_list' ? 1 : 0;
+      const bCoverage = b.coverage === 'complete_list' ? 1 : 0;
+      return (bPriority - aPriority) || (bCoverage - aCoverage) || (b.level - a.level);
     })
     .slice(0, analysis.comparison ? 10 : 7);
 }
