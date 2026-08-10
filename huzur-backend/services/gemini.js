@@ -70,7 +70,16 @@ function normalizeDraft(draft, sources, analysis) {
   const views = (Array.isArray(draft.views) ? draft.views : []).flatMap(view => {
     const sourceIds = sanitizeIds(view.source_ids, sources.length);
     if (!view?.answer || sourceIds.length === 0) return [];
-    return [{ label: String(view.label || 'Kaynak görüşü'), answer: String(view.answer), source_ids: sourceIds }];
+    const sourceLabels = [...new Set(sourceIds
+      .map(id => sources[id - 1]?.label)
+      .filter(Boolean))];
+    const modelLabel = String(view.label || '');
+    const label = sourceLabels.length === 1
+      ? sourceLabels[0]
+      : sourceLabels.find(item => modelLabel.toLocaleLowerCase('tr-TR').includes(
+        item.toLocaleLowerCase('tr-TR'),
+      )) || sourceLabels.join(' + ') || 'Kaynak görüşü';
+    return [{ label, answer: String(view.answer), source_ids: sourceIds }];
   });
   const usedIds = sanitizeIds(
     [...sanitizeIds(draft.source_ids, sources.length), ...views.flatMap(view => view.source_ids)],
