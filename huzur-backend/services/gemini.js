@@ -3,6 +3,8 @@ const Groq = require('groq-sdk');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+const FALLBACK_MODEL = process.env.GROQ_FALLBACK_MODEL || 'llama-3.1-8b-instant';
+const VALIDATOR_MODEL = process.env.GROQ_VALIDATOR_MODEL || FALLBACK_MODEL;
 const NO_SOURCE_MESSAGE = 'Bu konuda güvenilir ve doğrulanabilir bir fetva kaynağı bulamadım. Bu nedenle kesin bir hüküm vermek istemiyorum.';
 
 const SYSTEM_PROMPT = `Sen Huzur uygulamasının kaynak tabanlı İslami bilgi asistanısın.
@@ -25,17 +27,26 @@ function parseJson(text) {
   }
 }
 
-async function completeJson(messages, temperature = 0.1) {
+async function requestJson(messages, temperature, model) {
   const response = await groq.chat.completions.create({
-    messages,
-    model: MODEL,
-    temperature,
-    response_format: { type: 'json_object' },
+    messages, model, temperature, response_format: { type: 'json_object' },
   });
   return parseJson(response.choices[0]?.message?.content || '{}');
 }
 
-function sourceContext(sources) {
+async function completeJson(messages, { temperature = 0.1, model = MODEL, fallbackModel } = {}) {
+  try {
+    return await requestJson(messages, temperature, model);
+  } catch (error) {
+    if (error.status === 429 && fallbackModel && fallbackModel !== model) {
+      console.warn(`Groq ${model} rate limited; using ${fallbackModel}.`);
+      return requestJson(messages, temperature, fallbackModel);
+    }
+    throw error;
+  }
+}
+
+function sourceContext(sources, maxContentLength = 3500) {
   return sources.map((source, index) => `
 [KAYNAK ${index + 1}]
 Kurum: ${source.name}
@@ -44,7 +55,7 @@ Tür/seviye: ${source.type}/${source.level}
 Mezhep: ${source.madhhab || 'belirtilmedi'}
 Başlık: ${source.title}
 URL: ${source.url}
-İçerik: ${source.content.slice(0, 6500)}
+İçerik: ${source.content.slice(0, maxContentLength)}
 [/KAYNAK ${index + 1}]`).join('\n');
 }
 
@@ -81,14 +92,14 @@ Sadece kaynak kimliklerini kullan. Aynı JSON şemasını eksiksiz döndür.
 SORU: ${question}
 ANALİZ: ${JSON.stringify(analysis)}
 TASLAK: ${JSON.stringify(draft)}
-KAYNAKLAR: ${sourceContext(sources)}
+KAYNAKLAR: ${sourceContext(sources, 1800)}
 
 JSON şeması:
 {"short_answer":"...","answer":"...","source_ids":[1],"views":[{"label":"...","answer":"...","source_ids":[1]}]}`;
   return completeJson([
     { role: 'system', content: SYSTEM_PROMPT },
     { role: 'user', content: validationPrompt },
-  ], 0);
+  ], { temperature: 0, model: VALIDATOR_MODEL });
 }
 
 async function createGroundedAnswer(question, analysis, sources) {
@@ -119,9 +130,20 @@ Yalnız şu JSON şemasını döndür:
   const draft = normalizeDraft(await completeJson([
     { role: 'system', content: SYSTEM_PROMPT },
     { role: 'user', content: prompt },
-  ]), sources, analysis);
-  const validated = await validateDraft(question, draft, sources, analysis);
-  return normalizeDraft(validated, sources, analysis);
+  ], { fallbackModel: FALLBACK_MODEL }), sources, analysis);
+
+  try {
+    const validated = await validateDraft(question, draft, sources, analysis);
+    return normalizeDraft(validated, sources, analysis);
+  } catch (error) {
+    // The first pass is already source-constrained and source IDs are validated
+    // deterministically. A validator quota issue must not discard a safe answer.
+    if (error.status === 429) {
+      console.warn('Citation validator rate limited; returning the source-constrained draft.');
+      return draft;
+    }
+    throw error;
+  }
 }
 
 // Eski içe aktarmaları açık bir hata ile korur; bu yol artık /api/chat tarafından kullanılmaz.

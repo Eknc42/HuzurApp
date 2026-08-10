@@ -111,7 +111,14 @@ async function researchFatwa(question, analysis) {
   });
 
   return opened.filter(Boolean)
-    .sort((a, b) => b.level - a.level)
+    .sort((a, b) => {
+      const requestedMadhhab = analysis.madhhab && analysis.madhhab !== 'all'
+        ? analysis.madhhab
+        : null;
+      const aPriority = requestedMadhhab && a.madhhab === requestedMadhhab ? 1 : 0;
+      const bPriority = requestedMadhhab && b.madhhab === requestedMadhhab ? 1 : 0;
+      return (bPriority - aPriority) || (b.level - a.level);
+    })
     .slice(0, analysis.comparison ? 10 : 7);
 }
 
