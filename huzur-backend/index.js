@@ -64,15 +64,36 @@ function hydrateAnswer(generated, researchedSources, analysis) {
   };
 }
 
+function resolveContextualQuestion(question, history) {
+  const currentAnalysis = analyzeQuestion(question);
+  if (currentAnalysis.topic !== 'İslami bilgi' || !Array.isArray(history)) return question;
+
+  const previousUserMessage = [...history].reverse().find(item => (
+    item?.role === 'user' && typeof item.content === 'string' && item.content.trim()
+  ));
+  if (!previousUserMessage) return question;
+
+  const previousAnalysis = analyzeQuestion(previousUserMessage.content);
+  if (previousAnalysis.topic === 'İslami bilgi') return question;
+  return `${previousAnalysis.topic} hakkında: ${question}`;
+}
+
 async function handleChat(req, res) {
   const question = typeof req.body?.question === 'string' ? req.body.question.trim() : '';
   if (!question) return res.status(400).json({ success: false, error: 'Soru gereklidir.' });
   if (question.length > 500) return res.status(400).json({ success: false, error: 'Soru 500 karakterden kısa olmalıdır.' });
 
   try {
-    const analysis = analyzeQuestion(question, Boolean(req.body?.compare));
-    const researchedSources = await researchFatwa(question, analysis);
-    const generated = await createGroundedAnswer(question, analysis, researchedSources);
+    const history = Array.isArray(req.body?.history)
+      ? req.body.history.slice(-6).map(item => ({
+        role: item?.role === 'assistant' ? 'assistant' : 'user',
+        content: String(item?.content || '').slice(0, 500),
+      }))
+      : [];
+    const resolvedQuestion = resolveContextualQuestion(question, history);
+    const analysis = analyzeQuestion(resolvedQuestion, Boolean(req.body?.compare));
+    const researchedSources = await researchFatwa(resolvedQuestion, analysis);
+    const generated = await createGroundedAnswer(resolvedQuestion, analysis, researchedSources);
     return res.json(hydrateAnswer(generated, researchedSources, analysis));
   } catch (error) {
     console.error('Live fatwa research error:', error);
@@ -95,4 +116,4 @@ if (require.main === module) {
   app.listen(port, () => console.log(`Backend is running on port ${port}`));
 }
 
-module.exports = { app, handleChat, hydrateAnswer };
+module.exports = { app, handleChat, hydrateAnswer, resolveContextualQuestion };

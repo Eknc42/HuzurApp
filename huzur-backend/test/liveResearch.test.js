@@ -4,7 +4,7 @@ const { analyzeQuestion } = require('../services/questionAnalyzer');
 const { buildSearchPlan, internationalSearchPhrase } = require('../services/fatwaResearch');
 const { classifySource } = require('../services/sourceRegistry');
 const { verifySource } = require('../services/webSearch');
-const { hydrateAnswer } = require('../index');
+const { hydrateAnswer, resolveContextualQuestion } = require('../index');
 
 test('Hanefi seferilik sorusunu analiz eder', () => {
   const result = analyzeQuestion('Hanefi mezhebine göre seferi namaz nasıl kılınır?');
@@ -63,6 +63,22 @@ test('açılmış sayfa içerik ilgisini doğrular', () => {
     text: 'Kaza namazının ne zaman ve nasıl kılınacağı açıklanır.',
   }, 'seferi namaz kılınır');
   assert.equal(falsePositive.valid, false);
+
+  const fridaySpecific = verifySource({
+    url: 'https://kurul.diyanet.gov.tr/tr/fetva/cuma',
+    title: 'Cuma namazı kimlere farzdır?',
+    text: 'Cuma namazının yükümlülük şartları açıklanır.',
+  }, 'Namaz kimlere farz değildir?');
+  assert.equal(fridaySpecific.valid, false);
+  assert.equal(fridaySpecific.reason, 'overly_specific_page');
+});
+
+test('kısa takip sorusunu önceki kullanıcının konusu ile çözer', () => {
+  const resolved = resolveContextualQuestion('Kimlere farz değildir?', [
+    { role: 'user', content: 'Namaz kimlere farzdır?' },
+    { role: 'assistant', content: 'Kaynaklı cevap.' },
+  ]);
+  assert.equal(resolved, 'namaz hakkında: Kimlere farz değildir?');
 });
 
 test('model URL üretemez; yanıt URLleri yalnız araştırılmış kaynaktan gelir', () => {

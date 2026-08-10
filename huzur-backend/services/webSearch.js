@@ -225,6 +225,13 @@ function verifySource(page, question) {
   const classification = classifySource(page.url);
   if (!classification || classification.level < 2) return { valid: false, reason: 'untrusted_domain' };
   const haystack = `${page.title} ${page.text}`.toLocaleLowerCase('tr-TR');
+  const normalizedQuestion = String(question).toLocaleLowerCase('tr-TR');
+  const normalizedTitle = String(page.title).toLocaleLowerCase('tr-TR');
+  const overlySpecificTerms = ['cuma', 'bayram', 'cenaze', 'vitir', 'teravih'];
+  const mismatchedSpecificity = overlySpecificTerms.some(term => (
+    normalizedTitle.includes(term) && !normalizedQuestion.includes(term)
+  ));
+  if (mismatchedSpecificity) return { valid: false, reason: 'overly_specific_page' };
   const tokens = queryTokens(question);
   const matches = tokens.filter(token => tokenAppears(haystack, token));
   const requiredMatches = classification.level === 5

@@ -177,7 +177,14 @@ export default function AIChatScreen({ navigation }) {
         throw new Error('İnternet bağlantınız yok. Lütfen kontrol edin.');
       }
 
-      const response = await sendChatMessage(question);
+      const history = messages
+        .filter(message => message.role === 'user' || message.role === 'assistant')
+        .slice(-6)
+        .map(message => ({
+          role: message.role,
+          content: message.text,
+        }));
+      const response = await sendChatMessage(question, { history });
 
       if (response && response.success) {
         const assistantMsg = {

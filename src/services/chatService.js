@@ -8,14 +8,14 @@ const BASE_URL = PRODUCTION_URL;
  * @param {string} question - The user's query
  * @returns {Promise<{ success: boolean, answer: string, bestScore: number, sources: Array }>}
  */
-export async function sendChatMessage(question, { compare = false } = {}) {
+export async function sendChatMessage(question, { compare = false, history = [] } = {}) {
   const url = `${BASE_URL}${compare ? '/api/chat/compare' : '/api/chat'}`;
   const options = {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ question, compare }),
+    body: JSON.stringify({ question, compare, history: history.slice(-6) }),
   };
 
   try {
