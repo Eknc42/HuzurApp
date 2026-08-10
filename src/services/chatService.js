@@ -1,27 +1,26 @@
-import { Platform } from 'react-native';
 import { fetchWithRetry } from './networkService';
 
-// Production Render URL
-const BASE_URL = 'https://huzur-ai-api.onrender.com';
+const PRODUCTION_URL = 'https://huzur-ai-api.onrender.com';
+const BASE_URL = PRODUCTION_URL;
 
 /**
- * Sends a message to the Hybrid RAG chat backend and returns the response.
+ * Sends a message to the live source-research backend and returns the response.
  * @param {string} question - The user's query
  * @returns {Promise<{ success: boolean, answer: string, bestScore: number, sources: Array }>}
  */
-export async function sendChatMessage(question) {
-  const url = `${BASE_URL}/api/chat`;
+export async function sendChatMessage(question, { compare = false } = {}) {
+  const url = `${BASE_URL}${compare ? '/api/chat/compare' : '/api/chat'}`;
   const options = {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({ question, compare }),
   };
 
   try {
-    // Timeout extended to 60 seconds to allow Gemini API to handle rate limits and retries
-    const data = await fetchWithRetry(url, options, 3, 60000); 
+    // Multiple live searches and page verification can take longer than a plain model call.
+    const data = await fetchWithRetry(url, options, 1, 90000);
     return data;
   } catch (error) {
     console.warn('Chat API error:', error);
