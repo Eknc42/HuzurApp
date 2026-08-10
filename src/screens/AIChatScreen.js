@@ -26,8 +26,10 @@ import { sendChatMessage } from '../services/chatService';
 import AnimatedText from '../components/AnimatedText';
 import { getNetworkStatus } from '../services/networkService';
 
-const SESSIONS_KEY = '@ai_chat_sessions';
-const MSG_KEY_PREFIX = '@ai_chat_msgs_';
+// v2 prevents previously cached, pre-citation-validation answers from being
+// shown after the live-source backend migration. Other app storage is untouched.
+const SESSIONS_KEY = '@ai_chat_sessions_v2';
+const MSG_KEY_PREFIX = '@ai_chat_msgs_v2_';
 
 const DEFAULT_WELCOME_MESSAGE = {
   id: 'welcome',
