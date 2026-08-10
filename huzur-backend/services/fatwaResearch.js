@@ -57,6 +57,19 @@ function buildSearchPlan(question, analysis) {
   return plan;
 }
 
+function curatedCandidates(analysis, verificationQuestion) {
+  if (analysis.topic !== 'abdest' || analysis.madhhab !== 'shafii') return [];
+  return [{
+    title: 'The Bare Essentials of a Valid Prayer - IslamQA',
+    url: 'https://islamqa.org/shafii/qibla-shafii/33302/the-bare-essentials-of-a-valid-prayer/',
+    snippet: 'Four things nullify ablution',
+    searchLabel: MADHHAB_LABELS.shafii,
+    madhhab: 'shafii',
+    coverage: 'complete_list',
+    verificationQuestion,
+  }];
+}
+
 async function mapLimited(items, limit, worker) {
   const results = new Array(items.length);
   let cursor = 0;
@@ -159,8 +172,8 @@ async function researchFatwa(question, analysis) {
     }
   });
 
-  const candidates = [];
-  const seen = new Set();
+  const candidates = curatedCandidates(analysis, internationalQuestion);
+  const seen = new Set(candidates.map(candidate => candidate.url));
   searches.forEach(({ entry, results }) => results.slice(0, 2).forEach(result => {
     if (!seen.has(result.url) && candidates.length < 14) {
       seen.add(result.url);
@@ -207,6 +220,7 @@ async function researchFatwa(question, analysis) {
 
 module.exports = {
   buildSearchPlan,
+  curatedCandidates,
   focusedSearchPhrase,
   internationalSearchPhrase,
   researchTrustedEducationalSources,

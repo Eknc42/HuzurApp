@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { analyzeQuestion } = require('../services/questionAnalyzer');
-const { buildSearchPlan, internationalSearchPhrase } = require('../services/fatwaResearch');
+const { buildSearchPlan, curatedCandidates, internationalSearchPhrase } = require('../services/fatwaResearch');
 const { classifySource } = require('../services/sourceRegistry');
 const { verifySource } = require('../services/webSearch');
 const { createDeterministicSourceAnswer } = require('../services/gemini');
@@ -41,6 +41,16 @@ test('Şafii abdest sorusunda tam liste kaynağına özel arama üretir', () => 
   const analysis = analyzeQuestion('Şafiilere göre abdesti bozan durumlar nedir?');
   const plan = buildSearchPlan('what invalidates wudu ablution', analysis);
   assert.ok(plan.some(entry => entry.madhhab === 'shafii' && entry.coverage === 'complete_list'));
+});
+
+test('Şafii abdest tam liste kaynağını arama sıralamasından bağımsız aday gösterir', () => {
+  const candidates = curatedCandidates(
+    analyzeQuestion('Şafiilere göre abdesti bozan durumlar nedir?'),
+    'what invalidates wudu ablution',
+  );
+  assert.equal(candidates.length, 1);
+  assert.match(candidates[0].url, /islamqa\.org\/shafii/);
+  assert.equal(candidates[0].coverage, 'complete_list');
 });
 
 test('Şafii abdest tam listesini model çağrısı olmadan güvenli biçimde aktarır', () => {
