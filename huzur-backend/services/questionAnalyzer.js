@@ -1,6 +1,6 @@
 const MADHHABS = {
   hanafi: /hanefi|hanafi/i,
-  shafii: /şafii|şafi[îi]|shafi[\s'-]?i/i,
+  shafii: /şafi(?:i|î)?|safi(?:i)?|shafi(?:[\s'-]?i)?/i,
   maliki: /maliki|mâliki/i,
   hanbali: /hanbeli|hanbali/i,
 };

@@ -15,6 +15,7 @@ test('Hanefi seferilik sorusunu analiz eder', () => {
 
 test('Türkçe mezhep adlarını tespit eder', () => {
   assert.equal(analyzeQuestion('Şafii mezhebine göre abdest nasıl bozulur?').madhhab, 'shafii');
+  assert.equal(analyzeQuestion('Şafi mezhebine göre seferi namazı nasıl kılınır?').madhhab, 'shafii');
   assert.equal(analyzeQuestion('Maliki mezhebinde bu hüküm nedir?').madhhab, 'maliki');
   assert.equal(analyzeQuestion('Hanbeli mezhebinde bu hüküm nedir?').madhhab, 'hanbali');
 });

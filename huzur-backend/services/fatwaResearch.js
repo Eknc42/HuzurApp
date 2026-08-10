@@ -10,7 +10,7 @@ const MADHHAB_SEARCH_LABELS = {
 
 function focusedSearchPhrase(question) {
   return String(question)
-    .replace(/(hanefi|şafii|şafiî|maliki|hanbeli)\s+mezhebine\s+göre/gi, ' ')
+    .replace(/(hanefi|şafi|şafii|şafiî|safi|safii|maliki|hanbeli)\s+mezhebine\s+göre/gi, ' ')
     .replace(/dört\s+mezhebe\s+göre/gi, ' ')
     .replace(/\b(nasıl|neden|nedir|mıdır|midır|caiz mi)\b/gi, ' ')
     .replace(/[?!.]/g, ' ')
