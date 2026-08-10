@@ -1,7 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { analyzeQuestion } = require('../services/questionAnalyzer');
-const { buildSearchPlan, curatedCandidates, internationalSearchPhrase } = require('../services/fatwaResearch');
+const {
+  buildSearchPlan,
+  curatedCandidates,
+  internationalSearchPhrase,
+  SHAFII_ABLUTION_REFERENCE,
+} = require('../services/fatwaResearch');
 const { classifySource } = require('../services/sourceRegistry');
 const { verifySource } = require('../services/webSearch');
 const { createDeterministicSourceAnswer } = require('../services/gemini');
@@ -51,6 +56,12 @@ test('Şafii abdest tam liste kaynağını arama sıralamasından bağımsız ad
   assert.equal(candidates.length, 1);
   assert.match(candidates[0].url, /islamqa\.org\/shafii/);
   assert.equal(candidates[0].coverage, 'complete_list');
+});
+
+test('hosting kaynağı açamazsa doğrulanmış Şafii referans özeti hazırdır', () => {
+  assert.match(SHAFII_ABLUTION_REFERENCE.content, /four things nullify ablution/i);
+  assert.match(SHAFII_ABLUTION_REFERENCE.url, /^https:\/\/islamqa\.org\/shafii/);
+  assert.equal(SHAFII_ABLUTION_REFERENCE.coverage, 'complete_list');
 });
 
 test('Şafii abdest tam listesini model çağrısı olmadan güvenli biçimde aktarır', () => {

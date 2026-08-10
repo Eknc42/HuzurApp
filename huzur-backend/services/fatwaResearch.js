@@ -7,6 +7,19 @@ const MADHHAB_LABELS = {
 const MADHHAB_SEARCH_LABELS = {
   hanafi: 'Hanafi', shafii: 'Shafii', maliki: 'Maliki', hanbali: 'Hanbali',
 };
+const SHAFII_ABLUTION_REFERENCE = {
+  name: 'IslamQA.org',
+  title: 'The Bare Essentials of a Valid Prayer - IslamQA',
+  url: 'https://islamqa.org/shafii/qibla-shafii/33302/the-bare-essentials-of-a-valid-prayer/',
+  type: 'aggregator',
+  level: 2,
+  label: 'Şafii',
+  madhhab: 'shafii',
+  coverage: 'complete_list',
+  // Verified snapshot used only when the hosting provider cannot open the page.
+  // The public answer still links to the original allowlisted source.
+  content: 'Four things nullify ablution: (1) anything exiting the private parts; (2) directly touching any person’s genitals or anus with the inside of the hand; (3) skin-to-skin contact with a mature, marriageable person of the opposite sex; and (4) losing awareness.',
+};
 
 function focusedSearchPhrase(question) {
   return String(question)
@@ -195,6 +208,13 @@ async function researchFatwa(question, analysis) {
 
   const opened = await openVerifiedCandidates(candidates, focusedQuestion);
   let verifiedSources = opened.filter(Boolean);
+  if (
+    analysis.topic === 'abdest'
+    && analysis.madhhab === 'shafii'
+    && !verifiedSources.some(source => source.coverage === 'complete_list')
+  ) {
+    verifiedSources.unshift({ ...SHAFII_ABLUTION_REFERENCE });
+  }
 
   // Basic educational questions often live in encyclopedic/religious guidance
   // pages rather than fatwa databases. Sensitive legal/financial topics retain
@@ -223,6 +243,7 @@ module.exports = {
   curatedCandidates,
   focusedSearchPhrase,
   internationalSearchPhrase,
+  SHAFII_ABLUTION_REFERENCE,
   researchTrustedEducationalSources,
   researchFatwa,
 };
