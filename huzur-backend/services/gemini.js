@@ -19,6 +19,13 @@ Kaynak içeriğinde açıkça mezhep adı yoksa o kaynağı bütün mezhebe atfe
 Özellikle tıp, boşanma, nikah, miras, finans ve kişisel meselelerde yetersiz kaynakla kesin hüküm verme.
 JSON dışında hiçbir şey yazma.`;
 
+const GENERAL_KNOWLEDGE_PROMPT = `Sen Huzur uygulamasının İslami bilgi asistanısın.
+Güvenilir web araştırması sonuç vermediği için yalnız genel bilgine dayanarak yardımcı olacaksın.
+Yanıtı kesin fetva gibi sunma ve belirli bir kuruma, mezhebe, alime, kitaba, ayete veya hadise atfetme.
+Kaynak veya URL uydurma. Emin olmadığın ayrıntıları çıkar.
+Tıp, boşanma, nikah, miras, finans, faiz ve kişiye özel hükümlerde ihtiyatlı ol; yetkin bir uzmana danışılmasını belirt.
+Cevabı Türkçe, kısa ve anlaşılır yaz. JSON dışında hiçbir şey yazma.`;
+
 function parseJson(text) {
   try {
     return JSON.parse(text);
@@ -115,13 +122,22 @@ JSON şeması:
 
 async function createGroundedAnswer(question, analysis, sources) {
   if (!sources.length) {
+    const generated = await completeJson([
+      { role: 'system', content: GENERAL_KNOWLEDGE_PROMPT },
+      {
+        role: 'user',
+        content: `SORU: ${question}\nSORU ANALİZİ: ${JSON.stringify(analysis)}\n\nYalnız şu JSON şemasını döndür:\n{"short_answer":"...","answer":"..."}`,
+      },
+    ], { fallbackModel: FALLBACK_MODEL });
+    const warning = 'Doğrulanabilir bir web kaynağı bulunamadı. Aşağıdaki yanıt genel AI bilgisine dayanmaktadır ve fetva değildir.';
     return {
-      short_answer: NO_SOURCE_MESSAGE,
-      answer: NO_SOURCE_MESSAGE,
+      short_answer: String(generated.short_answer || generated.answer || NO_SOURCE_MESSAGE),
+      answer: `${warning}\n\n${String(generated.answer || generated.short_answer || NO_SOURCE_MESSAGE)}`,
       has_multiple_views: false,
       topic: analysis.topic,
       source_ids: [],
       views: [],
+      general_knowledge: true,
     };
   }
 
@@ -145,13 +161,13 @@ Yalnız şu JSON şemasını döndür:
 
   try {
     const validated = await validateDraft(question, draft, sources, analysis);
-    return normalizeDraft(validated, sources, analysis);
+    return { ...normalizeDraft(validated, sources, analysis), general_knowledge: false };
   } catch (error) {
     // The first pass is already source-constrained and source IDs are validated
     // deterministically. A validator quota issue must not discard a safe answer.
     if (error.status === 429) {
       console.warn('Citation validator rate limited; returning the source-constrained draft.');
-      return draft;
+      return { ...draft, general_knowledge: false };
     }
     throw error;
   }

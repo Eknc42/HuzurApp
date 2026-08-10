@@ -112,3 +112,37 @@ test('eksik dört mezhep araştırmasında ortak hüküm üretmez', () => {
   assert.match(result.answer, /ortak hükmüymüş gibi kesin bir sonuç verilemez/i);
   assert.equal(result.views.find(view => view.label === 'Hanefi').sources.length, 0);
 });
+
+test('hiç kaynak bulunmazsa genel AI yanıtını açıkça etiketler', () => {
+  const result = hydrateAnswer({
+    answer: 'Doğrulanabilir bir web kaynağı bulunamadı. Genel bilgiye dayalı açıklama.',
+    short_answer: 'Genel bilgiye dayalı kısa cevap.',
+    topic: 'İslami bilgi',
+    source_ids: [],
+    has_multiple_views: false,
+    views: [],
+    general_knowledge: true,
+  }, [], { comparison: false });
+
+  assert.equal(result.answer_basis, 'general_ai_knowledge');
+  assert.match(result.source_warning, /genel AI bilgisine dayanır/i);
+  assert.deepEqual(result.sources, []);
+  assert.deepEqual(result.views, []);
+});
+
+test('kaynak bulunmayan karşılaştırmada genel AI yanıtının üstünü kapatmaz', () => {
+  const answer = 'Doğrulanabilir bir web kaynağı bulunamadı. Mezhepler hakkında kesin atıf yapmayan genel açıklama.';
+  const result = hydrateAnswer({
+    answer,
+    short_answer: 'Genel açıklama.',
+    topic: 'helal-haram',
+    source_ids: [],
+    has_multiple_views: false,
+    views: [],
+    general_knowledge: true,
+  }, [], { comparison: true, madhhab: 'all' });
+
+  assert.equal(result.answer, answer);
+  assert.equal(result.answer_basis, 'general_ai_knowledge');
+  assert.deepEqual(result.views, []);
+});

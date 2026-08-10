@@ -28,7 +28,7 @@ function hydrateAnswer(generated, researchedSources, analysis) {
     sources: getSources(view.source_ids),
   }));
 
-  if (analysis.comparison) {
+  if (analysis.comparison && !generated.general_knowledge) {
     const requestedLabels = ['Hanefi', 'Şafii', 'Maliki', 'Hanbeli', 'Diyanet', 'IIFA', 'Dar al-Ifta'];
     requestedLabels.forEach(label => {
       if (!views.some(view => view.label.toLocaleLowerCase('tr-TR').includes(label.toLocaleLowerCase('tr-TR')))) {
@@ -47,7 +47,9 @@ function hydrateAnswer(generated, researchedSources, analysis) {
       && view.sources.length > 0
     ))
   )).length;
-  const incompleteMadhhabComparison = analysis.comparison && sourcedMadhhabCount < 4;
+  const incompleteMadhhabComparison = analysis.comparison
+    && !generated.general_knowledge
+    && sourcedMadhhabCount < 4;
   const incompleteComparisonMessage = 'Dört mezhebin tamamı için güvenilir ve doğrulanabilir kaynak bulunamadı. Bu nedenle mezheplerin ortak hükmüymüş gibi kesin bir sonuç verilemez; yalnızca aşağıdaki doğrulanmış görüşler aktarılabilir.';
 
   return {
@@ -60,6 +62,10 @@ function hydrateAnswer(generated, researchedSources, analysis) {
     sources: usedSources,
     views,
     searched_live: true,
+    answer_basis: generated.general_knowledge ? 'general_ai_knowledge' : 'verified_web_sources',
+    source_warning: generated.general_knowledge
+      ? 'Bu yanıt için doğrulanabilir web kaynağı bulunamadı; içerik genel AI bilgisine dayanır.'
+      : null,
     can_compare: !analysis.comparison && usedSources.length > 0,
   };
 }
