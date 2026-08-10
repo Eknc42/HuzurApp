@@ -76,3 +76,21 @@ test('model URL üretemez; yanıt URLleri yalnız araştırılmış kaynaktan ge
   assert.equal(result.sources[0].url, researched[0].url);
   assert.equal(result.views[0].sources[0].url, researched[0].url);
 });
+
+test('eksik dört mezhep araştırmasında ortak hüküm üretmez', () => {
+  const researched = [{
+    name: 'SeekersGuidance', title: 'Şafii müzik görüşü',
+    url: 'https://seekersguidance.org/example', type: 'institutional', level: 4,
+    madhhab: 'shafii',
+  }];
+  const result = hydrateAnswer({
+    answer: 'Her dört mezhebe göre müzik haramdır.',
+    short_answer: 'Haramdır.', topic: 'helal-haram', source_ids: [1],
+    has_multiple_views: false,
+    views: [{ label: 'Şafii', answer: 'Şafii görüşü.', source_ids: [1] }],
+  }, researched, { comparison: true, madhhab: 'all' });
+
+  assert.doesNotMatch(result.answer, /her dört mezhebe göre/i);
+  assert.match(result.answer, /ortak hükmüymüş gibi kesin bir sonuç verilemez/i);
+  assert.equal(result.views.find(view => view.label === 'Hanefi').sources.length, 0);
+});

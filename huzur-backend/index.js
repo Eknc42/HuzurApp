@@ -41,10 +41,19 @@ function hydrateAnswer(generated, researchedSources, analysis) {
     });
   }
 
+  const sourcedMadhhabCount = ['Hanefi', 'Şafii', 'Maliki', 'Hanbeli'].filter(label => (
+    views.some(view => (
+      view.label.toLocaleLowerCase('tr-TR').includes(label.toLocaleLowerCase('tr-TR'))
+      && view.sources.length > 0
+    ))
+  )).length;
+  const incompleteMadhhabComparison = analysis.comparison && sourcedMadhhabCount < 4;
+  const incompleteComparisonMessage = 'Dört mezhebin tamamı için güvenilir ve doğrulanabilir kaynak bulunamadı. Bu nedenle mezheplerin ortak hükmüymüş gibi kesin bir sonuç verilemez; yalnızca aşağıdaki doğrulanmış görüşler aktarılabilir.';
+
   return {
     success: true,
-    answer: generated.answer,
-    short_answer: generated.short_answer,
+    answer: incompleteMadhhabComparison ? incompleteComparisonMessage : generated.answer,
+    short_answer: incompleteMadhhabComparison ? incompleteComparisonMessage : generated.short_answer,
     has_multiple_views: generated.has_multiple_views || views.length > 1,
     topic: generated.topic,
     analysis,
