@@ -49,7 +49,10 @@ function isSmokingQuestion(value) {
 
 function isPrayerInvalidatorQuestion(value) {
   const text = String(value || '').toLocaleLowerCase('tr-TR');
-  return /namaz/.test(text) && /(bozan|bozar|bozul|konuş)/.test(text);
+  if (!/namaz/.test(text)) return false;
+  const asksAboutSpeaking = /konuş/.test(text);
+  const asksForGeneralList = /namaz[ıi]?\s+(ne(ler)?\s+bozar|bozan(\s+(durum|şey|h[âa]l|davranış)\w*)?)/.test(text);
+  return asksAboutSpeaking || asksForGeneralList;
 }
 
 function focusedSearchPhrase(question) {
@@ -65,7 +68,7 @@ function focusedSearchPhrase(question) {
 function internationalSearchPhrase(question, analysis) {
   const text = String(question).toLocaleLowerCase('tr-TR');
   if (/sefer|yolcu/.test(text) && analysis.topic === 'namaz') return 'traveler prayer shortening rules';
-  if (analysis.topic === 'namaz' && /(bozan|bozar|bozul|konuş)/.test(text)) {
+  if (analysis.topic === 'namaz' && isPrayerInvalidatorQuestion(question)) {
     return 'what invalidates prayer salah speaking eating movement';
   }
   if (analysis.topic === 'abdest') return 'what invalidates wudu ablution';
@@ -77,23 +80,33 @@ function internationalSearchPhrase(question, analysis) {
   if (/adet|hayız/.test(text) && /kur/.test(text)) return 'menstruating woman recite Quran ruling';
   if (/zek[aâ]t/.test(text)) return 'eligible recipients of zakat';
   if (/iddet/.test(text)) return 'iddah waiting period after divorce';
-  return `${analysis.topic} Islamic ruling`;
+  // An untranslated broad topic query (for example "prayer Islamic ruling")
+  // tends to return a nearby but different fatwa. Unknown intents stay on the
+  // Turkish Diyanet/TDV path and fall back to clearly labelled general AI if
+  // no direct source is found.
+  return null;
 }
 
 function buildSearchPlan(question, analysis) {
   const plan = [
-    { label: 'Diyanet', query: `site:kurul.diyanet.gov.tr/tr/fetvalar ${question}`, madhhab: null },
-    { label: 'IIFA', query: `site:iifa-aifi.org/en ${question} Islamic ruling`, madhhab: null },
-    { label: 'Dar al-Ifta', query: `site:dar-alifta.org ${question} fatwa`, madhhab: null },
+    { label: 'Diyanet', query: 'Diyanet doğrudan arama', madhhab: null },
   ];
+  if (question) {
+    plan.push(
+      { label: 'IIFA', query: `site:iifa-aifi.org/en ${question}`, madhhab: null },
+      { label: 'Dar al-Ifta', query: `site:dar-alifta.org ${question} fatwa`, madhhab: null },
+    );
+  }
   const requested = analysis.madhhab === 'all'
     ? Object.keys(MADHHAB_LABELS)
     : analysis.madhhab ? [analysis.madhhab] : [];
-  requested.forEach(madhhab => plan.push({
-    label: MADHHAB_LABELS[madhhab],
-    madhhab,
-    query: `${MADHHAB_SEARCH_LABELS[madhhab]} ${question} site:seekersguidance.org OR site:islamqa.org`,
-  }));
+  if (question) {
+    requested.forEach(madhhab => plan.push({
+      label: MADHHAB_LABELS[madhhab],
+      madhhab,
+      query: `${MADHHAB_SEARCH_LABELS[madhhab]} ${question} site:seekersguidance.org OR site:islamqa.org`,
+    }));
+  }
   if (analysis.topic === 'abdest' && requested.includes('shafii')) {
     plan.push({
       label: MADHHAB_LABELS.shafii,
@@ -175,10 +188,9 @@ async function openVerifiedCandidates(candidates, focusedQuestion) {
       // Search results are never fetched unless the URL is already on the allowlist.
       if (!classifySource(candidate.url)) return null;
       const page = await openPage(candidate.url);
-      const verification = verifySource({
-        ...page,
-        title: `${candidate.title || page.title} ${candidate.snippet || ''}`.trim(),
-      }, candidate.verificationQuestion || focusedQuestion);
+      // Search titles/snippets help locate the page but are not evidence that
+      // the opened page answers the question. Verify only the page's own text.
+      const verification = verifySource(page, candidate.verificationQuestion || focusedQuestion);
       if (!verification.valid) return null;
       return {
         name: verification.classification.name,
@@ -250,7 +262,7 @@ async function researchFatwa(question, analysis) {
         // searched and written in English. Verify each page in its own query
         // language so a valid English madhhab source is not rejected merely
         // because the user's original question was Turkish.
-        verificationQuestion: entry.label === 'Diyanet'
+        verificationQuestion: entry.label === 'Diyanet' || !internationalQuestion
           ? focusedQuestion
           : internationalQuestion,
       });

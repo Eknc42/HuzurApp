@@ -162,6 +162,37 @@ JSON şeması:
   });
 }
 
+function sourcesDoNotAnswerQuestion(draft) {
+  if (!draft.source_ids?.length) return true;
+  const summary = `${draft.short_answer || ''} ${draft.answer || ''}`.toLocaleLowerCase('tr-TR');
+  return [
+    /kaynak(lar)?da[^.]{0,100}(bulunamad|bulunmamakta|yer almamakta|belirtilmem|içermem)/,
+    /doğrudan[^.]{0,80}(bilgi|görüş|hüküm)[^.]{0,60}(yok|yer alma)/,
+    /soruya[^.]{0,80}(cevap|yanıt)[^.]{0,60}(yok|verileme)/,
+    /kesin[^.]{0,50}(hüküm|yargı)[^.]{0,50}(verilemez|varılamaz)/,
+  ].some(pattern => pattern.test(summary));
+}
+
+async function createGeneralKnowledgeAnswer(question, analysis) {
+  const generated = await completeJson([
+    { role: 'system', content: GENERAL_KNOWLEDGE_PROMPT },
+    {
+      role: 'user',
+      content: `SORU: ${question}\nSORU ANALİZİ: ${JSON.stringify(analysis)}\n\nYalnız şu JSON şemasını döndür:\n{"short_answer":"...","answer":"..."}`,
+    },
+  ], { fallbackModel: FALLBACK_MODEL });
+  const warning = 'Doğrulanabilir bir web kaynağı bulunamadı. Aşağıdaki yanıt genel AI bilgisine dayanmaktadır ve fetva değildir.';
+  return {
+    short_answer: String(generated.short_answer || generated.answer || NO_SOURCE_MESSAGE),
+    answer: `${warning}\n\n${String(generated.answer || generated.short_answer || NO_SOURCE_MESSAGE)}`,
+    has_multiple_views: false,
+    topic: analysis.topic,
+    source_ids: [],
+    views: [],
+    general_knowledge: true,
+  };
+}
+
 function createDeterministicSourceAnswer(analysis, sources) {
   const prayerInvalidatorsSourceIndex = sources.findIndex(source => (
     source.coverage === 'prayer_invalidators'
@@ -236,23 +267,7 @@ async function createGroundedAnswer(question, analysis, sources) {
   if (deterministicAnswer) return deterministicAnswer;
 
   if (!sources.length) {
-    const generated = await completeJson([
-      { role: 'system', content: GENERAL_KNOWLEDGE_PROMPT },
-      {
-        role: 'user',
-        content: `SORU: ${question}\nSORU ANALİZİ: ${JSON.stringify(analysis)}\n\nYalnız şu JSON şemasını döndür:\n{"short_answer":"...","answer":"..."}`,
-      },
-    ], { fallbackModel: FALLBACK_MODEL });
-    const warning = 'Doğrulanabilir bir web kaynağı bulunamadı. Aşağıdaki yanıt genel AI bilgisine dayanmaktadır ve fetva değildir.';
-    return {
-      short_answer: String(generated.short_answer || generated.answer || NO_SOURCE_MESSAGE),
-      answer: `${warning}\n\n${String(generated.answer || generated.short_answer || NO_SOURCE_MESSAGE)}`,
-      has_multiple_views: false,
-      topic: analysis.topic,
-      source_ids: [],
-      views: [],
-      general_knowledge: true,
-    };
+    return createGeneralKnowledgeAnswer(question, analysis);
   }
 
   const prompt = `Kullanıcının sorusunu yalnız aşağıdaki açılmış sayfaların içeriğine göre yanıtla.
@@ -273,10 +288,17 @@ Yalnız şu JSON şemasını döndür:
     { role: 'system', content: SYSTEM_PROMPT },
     { role: 'user', content: prompt },
   ], { fallbackModel: FALLBACK_MODEL }), sources, analysis);
+  if (sourcesDoNotAnswerQuestion(draft)) {
+    return createGeneralKnowledgeAnswer(question, analysis);
+  }
 
   try {
     const validated = await validateDraft(question, draft, sources, analysis);
-    return { ...normalizeDraft(validated, sources, analysis), general_knowledge: false };
+    const normalized = normalizeDraft(validated, sources, analysis);
+    if (sourcesDoNotAnswerQuestion(normalized)) {
+      return createGeneralKnowledgeAnswer(question, analysis);
+    }
+    return { ...normalized, general_knowledge: false };
   } catch (error) {
     // Never expose an unvalidated draft from a smaller fallback model: it can
     // accidentally reverse a source's ruling. Keep the verified links visible
@@ -306,6 +328,7 @@ async function askGemini() {
 module.exports = {
   createGroundedAnswer,
   createDeterministicSourceAnswer,
+  sourcesDoNotAnswerQuestion,
   askGemini,
   NO_SOURCE_MESSAGE,
 };

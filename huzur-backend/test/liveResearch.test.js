@@ -11,7 +11,7 @@ const {
 } = require('../services/fatwaResearch');
 const { classifySource } = require('../services/sourceRegistry');
 const { verifySource } = require('../services/webSearch');
-const { createDeterministicSourceAnswer } = require('../services/gemini');
+const { createDeterministicSourceAnswer, sourcesDoNotAnswerQuestion } = require('../services/gemini');
 const { hydrateAnswer, resolveContextualQuestion } = require('../index');
 
 test('Hanefi seferilik sorusunu analiz eder', () => {
@@ -35,6 +35,10 @@ test('uluslararası arama için İngilizce konu sorgusu üretir', () => {
   assert.equal(
     internationalSearchPhrase('Sigara içmek caiz mi?', analyzeQuestion('Sigara içmek caiz mi?')),
     'smoking tobacco Islamic ruling',
+  );
+  assert.equal(
+    internationalSearchPhrase('Kediyi sevmek sevap mı?', analyzeQuestion('Kediyi sevmek sevap mı?')),
+    null,
   );
   assert.equal(
     internationalSearchPhrase('Namazda konuşmak namazı bozar mı?', analyzeQuestion('Namazda konuşmak namazı bozar mı?')),
@@ -97,6 +101,12 @@ test('namaz bozucuları için doğrulanmış Diyanet İlmihali özeti hazırdır
   assert.equal(PRAYER_INVALIDATORS_DIYANET_REFERENCE.coverage, 'prayer_invalidators');
 });
 
+test('özel namaz sorusunu genel namaz bozucuları listesine zorlamaz', () => {
+  const analysis = analyzeQuestion('Namazda gözleri kapatmak namazı bozar mı?');
+  assert.deepEqual(curatedCandidates(analysis, null), []);
+  assert.equal(internationalSearchPhrase(analysis.subtopic, analysis), null);
+});
+
 test('namazda konuşma sorusunu model çağrısı olmadan cevaplar', () => {
   const result = createDeterministicSourceAnswer(
     analyzeQuestion('Namazda konuşmak namazı bozar mı?'),
@@ -144,7 +154,7 @@ test('açılmış sayfa içerik ilgisini doğrular', () => {
   const valid = verifySource({
     url: 'https://fetva.diyanet.gov.tr/oruc',
     title: 'Oruç ve diş macunu',
-    text: 'Oruçluyken diş macunu kullanmanın hükmü hakkında ayrıntılı açıklama.',
+    text: 'Oruçluyken diş macunu kullanmanın orucu bozup bozmadığı hakkında ayrıntılı açıklama.',
   }, 'Oruçluyken diş macunu kullanmak orucu bozar mı?');
   assert.equal(valid.valid, true);
 
@@ -167,6 +177,33 @@ test('açılmış sayfa içerik ilgisini doğrular', () => {
   }, 'Namaz kimlere farz değildir?');
   assert.equal(fridaySpecific.valid, false);
   assert.equal(fridaySpecific.reason, 'overly_specific_page');
+
+  const nearbyPrayerPage = verifySource({
+    url: 'https://www.dar-alifta.org/en/fatwa/prayer-time',
+    title: 'May work continue during prayer time?',
+    text: 'A merchant may organize work around prayer time. The imam should keep prayer concise.',
+  }, 'what invalidates prayer');
+  assert.equal(nearbyPrayerPage.valid, false);
+
+  const misleadingStemMatch = verifySource({
+    url: 'https://kurul.diyanet.gov.tr/tr/fetva/cok-hareket',
+    title: 'Namazda çok hareket etmek',
+    text: 'Dışarıdan gözlemleyen kişide namazda olunmadığı izlenimi veren hareket namazı bozar.',
+  }, 'Namazda gözleri kapatmak namazı bozar mı?');
+  assert.equal(misleadingStemMatch.valid, false);
+});
+
+test('soruyu cevaplamadığını söyleyen kaynak taslağını yetersiz kabul eder', () => {
+  assert.equal(sourcesDoNotAnswerQuestion({
+    short_answer: 'Kaynaklarda bu konuda bilgi bulunmamaktadır.',
+    answer: 'Verilen kaynaklar yakın bir konuyu ele almaktadır.',
+    source_ids: [1],
+  }), true);
+  assert.equal(sourcesDoNotAnswerQuestion({
+    short_answer: 'Namazda konuşmak namazı bozar.',
+    answer: 'Kaynak bu hükmü açıkça belirtir.',
+    source_ids: [1],
+  }), false);
 });
 
 test('kısa takip sorusunu önceki kullanıcının konusu ile çözer', () => {

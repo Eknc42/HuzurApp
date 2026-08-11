@@ -191,7 +191,11 @@ async function openPage(url) {
 }
 
 function queryTokens(question) {
-  const stop = new Set(['acaba', 'göre', 'için', 'nasıl', 'nedir', 'mıdır', 'mudur', 'mi', 'mı', 'mu', 'mü', 've', 'veya', 'bir']);
+  const stop = new Set([
+    'acaba', 'göre', 'için', 'nasıl', 'nedir', 'mıdır', 'mudur', 'mi', 'mı', 'mu', 'mü',
+    've', 'veya', 'bir', 'durum', 'durumlar', 'şey', 'şeyler', 'konu', 'hakkında', 'bilgi',
+    'what', 'does', 'the', 'islamic', 'ruling',
+  ]);
   return String(question).toLocaleLowerCase('tr-TR')
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .split(/\s+/).filter(token => token.length > 2 && !stop.has(token));
@@ -224,7 +228,9 @@ function tokenAppears(haystack, token) {
     caiz: ['permissible', 'ruling'],
   };
   return haystack.includes(token)
-    || (token.length >= 6 && haystack.includes(token.slice(0, 5)))
+    // Six characters preserve useful Turkish inflection matching (abdest-i,
+    // kullan-mak) without collisions such as "gözleri" → "gözlemleyen".
+    || (token.length >= 7 && haystack.includes(token.slice(0, 6)))
     || (aliases[token] || []).some(alias => haystack.includes(alias));
 }
 
@@ -241,9 +247,9 @@ function verifySource(page, question) {
   if (mismatchedSpecificity) return { valid: false, reason: 'overly_specific_page' };
   const tokens = queryTokens(question);
   const matches = tokens.filter(token => tokenAppears(haystack, token));
-  const requiredMatches = classification.level === 5
-    ? (tokens.length <= 3 ? tokens.length : Math.ceil(tokens.length * 0.6))
-    : Math.min(2, tokens.length);
+  const requiredMatches = tokens.length <= 3
+    ? tokens.length
+    : Math.max(2, Math.ceil(tokens.length * 0.7));
   const relevant = tokens.length === 0 || matches.length >= requiredMatches;
   return { valid: relevant, reason: relevant ? null : 'not_relevant', classification, matches };
 }
