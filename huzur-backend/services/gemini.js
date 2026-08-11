@@ -24,9 +24,19 @@ JSON dışında hiçbir şey yazma.`;
 const GENERAL_KNOWLEDGE_PROMPT = `Sen Huzur uygulamasının İslami bilgi asistanısın.
 Güvenilir web araştırması sonuç vermediği için yalnız genel bilgine dayanarak yardımcı olacaksın.
 Yanıtı kesin fetva gibi sunma ve belirli bir kuruma, mezhebe, alime, kitaba, ayete veya hadise atfetme.
+Peygamber, sahabe veya tarihî kişi hakkında rivayet, alıntı ya da örnek verme; doğrulanmamış nakil kullanma.
 Kaynak veya URL uydurma. Emin olmadığın ayrıntıları çıkar.
 Tıp, boşanma, nikah, miras, finans, faiz ve kişiye özel hükümlerde ihtiyatlı ol; yetkin bir uzmana danışılmasını belirt.
 Cevabı Türkçe, kısa ve anlaşılır yaz. JSON dışında hiçbir şey yazma.`;
+
+function removeUnverifiedAttributions(value) {
+  const forbiddenAttribution = /\b(ayet|hadis|rivayet|peygamber|resul|rasul|sahabe|ashab|ebu\s+hur(?:e|ey)re|imam|âlim|alim|kitab|kurum|diyanet)/i;
+  return String(value || '')
+    .split(/(?<=[.!?])\s+/)
+    .filter(sentence => !forbiddenAttribution.test(sentence))
+    .join(' ')
+    .trim();
+}
 
 function parseJson(text) {
   try {
@@ -182,9 +192,11 @@ async function createGeneralKnowledgeAnswer(question, analysis) {
     },
   ], { fallbackModel: FALLBACK_MODEL });
   const warning = 'Güvenilir web kaynakları araştırıldı ancak soruyu doğrudan cevaplayan doğrulanabilir bir sayfa bulunamadı. Aşağıdaki yanıt genel AI bilgisine dayanmaktadır ve fetva değildir.';
+  const shortAnswer = removeUnverifiedAttributions(generated.short_answer);
+  const answer = removeUnverifiedAttributions(generated.answer);
   return {
-    short_answer: String(generated.short_answer || generated.answer || NO_SOURCE_MESSAGE),
-    answer: `${warning}\n\n${String(generated.answer || generated.short_answer || NO_SOURCE_MESSAGE)}`,
+    short_answer: shortAnswer || answer || NO_SOURCE_MESSAGE,
+    answer: `${warning}\n\n${answer || shortAnswer || NO_SOURCE_MESSAGE}`,
     has_multiple_views: false,
     topic: analysis.topic,
     source_ids: [],
@@ -328,6 +340,7 @@ async function askGemini() {
 module.exports = {
   createGroundedAnswer,
   createDeterministicSourceAnswer,
+  removeUnverifiedAttributions,
   sourcesDoNotAnswerQuestion,
   askGemini,
   NO_SOURCE_MESSAGE,

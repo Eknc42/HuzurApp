@@ -12,7 +12,11 @@ const {
 } = require('../services/fatwaResearch');
 const { classifySource } = require('../services/sourceRegistry');
 const { verifySource } = require('../services/webSearch');
-const { createDeterministicSourceAnswer, sourcesDoNotAnswerQuestion } = require('../services/gemini');
+const {
+  createDeterministicSourceAnswer,
+  removeUnverifiedAttributions,
+  sourcesDoNotAnswerQuestion,
+} = require('../services/gemini');
 const { hydrateAnswer, resolveContextualQuestion } = require('../index');
 
 test('Hanefi seferilik sorusunu analiz eder', () => {
@@ -269,6 +273,13 @@ test('hiç kaynak bulunmazsa genel AI yanıtını açıkça etiketler', () => {
   assert.match(result.source_warning, /genel AI bilgisine dayanır/i);
   assert.deepEqual(result.sources, []);
   assert.deepEqual(result.views, []);
+});
+
+test('kaynaksız AI yanıtından doğrulanmamış dinî atıfları çıkarır', () => {
+  const result = removeUnverifiedAttributions(
+    'Canlılara merhamet teşvik edilir. Bir hadiste bunun sevap olduğu bildirilmiştir. Kedilere iyi davranmak güzel bir davranıştır.',
+  );
+  assert.equal(result, 'Canlılara merhamet teşvik edilir. Kedilere iyi davranmak güzel bir davranıştır.');
 });
 
 test('kaynak bulunmayan karşılaştırmada genel AI yanıtının üstünü kapatmaz', () => {
