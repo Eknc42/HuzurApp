@@ -216,16 +216,23 @@ async function openVerifiedCandidates(candidates, focusedQuestion) {
   });
 }
 
-async function researchTrustedEducationalSources(focusedQuestion) {
+function buildTrustedEducationalQuery(question) {
+  return `site:islamansiklopedisi.org.tr OR site:diyanet.gov.tr ${String(question).trim()}`;
+}
+
+async function researchTrustedEducationalSources(question) {
   try {
-    const query = `site:islamansiklopedisi.org.tr OR site:diyanet.gov.tr ${focusedQuestion}`;
+    // Preserve the full wording (including "caiz mi", "bozar mı", etc.).
+    // Removing the intent words turns an exact web search into a broad topic
+    // search and makes the app appear as if it did not research the question.
+    const query = buildTrustedEducationalQuery(question);
     const results = await webSearch(query, { count: 5 });
     const candidates = results.slice(0, 4).map(result => ({
       ...result,
       searchLabel: 'Güvenilir İslami bilgi kaynağı',
       madhhab: null,
     }));
-    return (await openVerifiedCandidates(candidates, focusedQuestion)).filter(Boolean);
+    return (await openVerifiedCandidates(candidates, question)).filter(Boolean);
   } catch (error) {
     console.warn('Trusted educational source search skipped:', error.message);
     return [];
@@ -239,7 +246,11 @@ async function researchFatwa(question, analysis) {
   const searches = await mapLimited(plan, 3, async entry => {
     try {
       const results = entry.label === 'Diyanet'
-        ? await searchDiyanet(focusedQuestion, { count: 3 })
+        ? await (async () => {
+          const exactResults = await searchDiyanet(question, { count: 3 });
+          if (exactResults.length || focusedQuestion === question) return exactResults;
+          return searchDiyanet(focusedQuestion, { count: 3 });
+        })()
         : await webSearch(entry.query, { count: 3 });
       return { entry, results };
     } catch (error) {
@@ -296,7 +307,7 @@ async function researchFatwa(question, analysis) {
   // the stricter fatwa-only failure behavior.
   const sensitiveTopic = ['boşanma', 'finans', 'aile'].includes(analysis.topic);
   if (verifiedSources.length === 0 && !analysis.comparison && !analysis.madhhab && !sensitiveTopic) {
-    verifiedSources = await researchTrustedEducationalSources(focusedQuestion);
+    verifiedSources = await researchTrustedEducationalSources(question);
   }
 
   const uniqueSources = verifiedSources.filter((source, index, items) => {
@@ -338,6 +349,7 @@ async function researchFatwa(question, analysis) {
 
 module.exports = {
   buildSearchPlan,
+  buildTrustedEducationalQuery,
   curatedCandidates,
   focusedSearchPhrase,
   internationalSearchPhrase,

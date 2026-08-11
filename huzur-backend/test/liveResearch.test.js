@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { analyzeQuestion } = require('../services/questionAnalyzer');
 const {
   buildSearchPlan,
+  buildTrustedEducationalQuery,
   curatedCandidates,
   internationalSearchPhrase,
   SHAFII_ABLUTION_REFERENCE,
@@ -44,6 +45,13 @@ test('uluslararası arama için İngilizce konu sorgusu üretir', () => {
     internationalSearchPhrase('Namazda konuşmak namazı bozar mı?', analyzeQuestion('Namazda konuşmak namazı bozar mı?')),
     'what invalidates prayer salah speaking eating movement',
   );
+});
+
+test('güvenilir Türkçe web aramasında sorunun hüküm ifadesini korur', () => {
+  const query = buildTrustedEducationalQuery('Kediyi sevmek sevap mı?');
+  assert.match(query, /site:islamansiklopedisi\.org\.tr/);
+  assert.match(query, /site:diyanet\.gov\.tr/);
+  assert.match(query, /Kediyi sevmek sevap mı\?/);
 });
 
 test('dört mezhep sorusu tüm mezheplere ayrı arama üretir', () => {

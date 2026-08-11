@@ -181,7 +181,7 @@ async function createGeneralKnowledgeAnswer(question, analysis) {
       content: `SORU: ${question}\nSORU ANALİZİ: ${JSON.stringify(analysis)}\n\nYalnız şu JSON şemasını döndür:\n{"short_answer":"...","answer":"..."}`,
     },
   ], { fallbackModel: FALLBACK_MODEL });
-  const warning = 'Doğrulanabilir bir web kaynağı bulunamadı. Aşağıdaki yanıt genel AI bilgisine dayanmaktadır ve fetva değildir.';
+  const warning = 'Güvenilir web kaynakları araştırıldı ancak soruyu doğrudan cevaplayan doğrulanabilir bir sayfa bulunamadı. Aşağıdaki yanıt genel AI bilgisine dayanmaktadır ve fetva değildir.';
   return {
     short_answer: String(generated.short_answer || generated.answer || NO_SOURCE_MESSAGE),
     answer: `${warning}\n\n${String(generated.answer || generated.short_answer || NO_SOURCE_MESSAGE)}`,
